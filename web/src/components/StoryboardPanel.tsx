@@ -475,14 +475,13 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
                   <option value="minimax-audiobook_male_1">男声-有声书1</option>
                   <option value="minimax-audiobook_male_2">男声-有声书2</option>
                 </optgroup>
-                <optgroup label="Kling">
-                  <option value="kling-alloy">Alloy</option>
-                  <option value="kling-echo">Echo</option>
-                  <option value="kling-fable">Fable</option>
-                  <option value="kling-onyx">Onyx</option>
-                  <option value="kling-nova">Nova</option>
-                  <option value="kling-shimmer">Shimmer</option>
-                </optgroup>
+                 <optgroup label="Kling">
+                   <option value="kling-Binbin">Binbin (彬彬)</option>
+                   <option value="kling-Dashu">Dashu (大叔)</option>
+                   <option value="kling-Xiaomei">Xiaomei (小美)</option>
+                   <option value="kling-Aibo">Aibo (艾博)</option>
+                   <option value="kling-Yezi">Yezi (叶子)</option>
+                 </optgroup>
               </select>
             </div>
           )}

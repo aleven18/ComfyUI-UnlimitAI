@@ -3,8 +3,9 @@ import { useState } from 'react';
 const API_BASE_URL = 'https://api.unlimitai.org';
 
 const TEST_MODELS = [
-  { id: 'doubao-seedream-4-0-250828', name: '🫘 豆包 Seedream 4.0', description: '推荐：速度快（11.9秒）' },
-  { id: 'gpt-image-1-all', name: '🍌 香蕉 GPT Image All', description: '备用：稳定（13.5秒）' }
+  { id: 'kling-v2', name: 'Kling V2', description: 'Kling 图像生成（推荐）' },
+  { id: 'flux-pro', name: 'Flux Pro', description: 'Flux 高质量生成' },
+  { id: 'gpt-image', name: 'GPT Image', description: 'OpenAI GPT Image' }
 ];
 
 interface TestResult {

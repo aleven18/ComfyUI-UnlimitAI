@@ -1,8 +1,31 @@
 import json
+import os
 
 from typing_extensions import override
 
 from comfy_api.latest import IO, ComfyExtension
+
+
+_CONFIG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CONFIG_FILE = os.path.join(_CONFIG_DIR, "unlimitai_api_config.json")
+
+
+def _load_api_config() -> dict:
+    try:
+        if os.path.exists(_CONFIG_FILE):
+            with open(_CONFIG_FILE, "r") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _save_api_config(config: dict) -> None:
+    try:
+        with open(_CONFIG_FILE, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception:
+        pass
 
 
 PRICING = {
@@ -149,10 +172,48 @@ class CostEstimatorV3Node(IO.ComfyNode):
         return IO.NodeOutput(cost, breakdown)
 
 
+class UnlimitAIApiConfigV3Node(IO.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="UnlimitAIApiConfigV3Node",
+            display_name="API Config [V3]",
+            category="api node/config",
+            description="API key and routing configuration. Outputs api_key and base_url for fan-out to other nodes.",
+            inputs=[
+                IO.String.Input("api_key", default="", multiline=False, tooltip="UnlimitAI API key. Saved to config file as fallback."),
+                IO.Combo.Input("provider", options=["unlimitai", "custom"], default="unlimitai", tooltip="API provider. 'unlimitai' uses the default endpoint. 'custom' lets you specify a base URL."),
+                IO.String.Input("custom_base_url", default="", multiline=False, optional=True, tooltip="Custom API base URL (only used when provider='custom')."),
+            ],
+            outputs=[
+                IO.String.Output("api_key"),
+                IO.String.Output("base_url"),
+            ],
+            hidden=[IO.Hidden.unique_id],
+            is_api_node=False,
+        )
+
+    @classmethod
+    async def execute(cls, api_key: str = "", provider: str = "unlimitai", custom_base_url: str = ""):
+        effective_key = api_key.strip()
+        if not effective_key:
+            saved = _load_api_config()
+            effective_key = saved.get("api_key", "")
+        if effective_key and api_key.strip():
+            _save_api_config({"api_key": effective_key, "provider": provider, "custom_base_url": custom_base_url})
+
+        if provider == "custom" and custom_base_url.strip():
+            base_url = custom_base_url.strip()
+        else:
+            base_url = "https://api.unlimitai.org"
+
+        return IO.NodeOutput(effective_key, base_url)
+
+
 class UnlimitAIConfigV3Extension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[IO.ComfyNode]]:
-        return [DramaConfigV3Node, ModelComparisonV3Node, CostEstimatorV3Node]
+        return [DramaConfigV3Node, ModelComparisonV3Node, CostEstimatorV3Node, UnlimitAIApiConfigV3Node]
 
 
 async def comfy_entrypoint() -> UnlimitAIConfigV3Extension:

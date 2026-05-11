@@ -147,7 +147,7 @@ export function ModularWorkflow() {
           max_characters: 5,
           reference_images_per_character: 5,
           min_selected_images: 3,
-          image_model: 'doubao-seedream-4-0-250828'
+          image_model: 'kling-v2'
         })
       });
       if (!response.ok) {
@@ -295,8 +295,8 @@ export function ModularWorkflow() {
           module2_data: JSON.stringify(module2Data),
           module3_data: JSON.stringify(module3Data),
           batch_size: 5,
-          image_model: settings.defaultImageModel || 'doubao-seedream-4-0-250828',
-          video_model: settings.defaultVideoModel || 'doubao-seedance-1-0-lite-i2v-250428'
+          image_model: settings.defaultImageModel || 'kling-v2',
+          video_model: settings.defaultVideoModel || 'kling-v2-master'
         })
       });
       if (!response.ok) {
@@ -716,11 +716,13 @@ function ModuleDetail({
               {/* 分镜编辑器 */}
               <StoryboardEditor
                 novelText={novelText}
-                initialStoryboard={moduleState.data.storyboard?.shots}
-                onStoryboardChange={(shots: any) => {
+                shots={moduleState.data.storyboard?.shots || []}
+                onShotsChange={(shots: any) => {
                   console.log('用户编辑了分镜:', shots);
                 }}
-                isGenerating={false}
+                onStartGeneration={(shots: any) => {
+                  console.log('开始生成分镜:', shots);
+                }}
               />
 
               {/* 用户确认 */}

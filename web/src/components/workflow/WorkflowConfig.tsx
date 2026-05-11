@@ -70,8 +70,9 @@ export function WorkflowConfig() {
                   value={settings.defaultImageModel}
                   onChange={(e) => updateSettings({ defaultImageModel: e.target.value })}
                 >
-                  <option value="doubao-seedream-4-0-250828">🫘 豆包 Seedream 4.0 ✓ (11.9秒)</option>
-                  <option value="gpt-image-1-all">🍌 香蕉 GPT Image All ✓ (13.5秒)</option>
+                  <option value="kling-v2">Kling V2</option>
+                  <option value="flux-pro">Flux Pro</option>
+                  <option value="gpt-image">GPT Image</option>
                 </select>
                 <p className="text-xs text-green-500 mt-2">
                   ✓ 已测试可用
@@ -141,8 +142,9 @@ export function WorkflowConfig() {
                     value={settings.defaultImageModel}
                     onChange={(e) => updateSettings({ defaultImageModel: e.target.value })}
                   >
-                    <option value="doubao-seedream-4-0-250828">🫘 豆包 Seedream 4.0 ✓</option>
-                    <option value="gpt-image-1-all">🍌 香蕉 GPT Image All ✓</option>
+                    <option value="kling-v2">Kling V2</option>
+                    <option value="flux-pro">Flux Pro</option>
+                    <option value="gpt-image">GPT Image</option>
                   </select>
                 </div>
                 
@@ -153,13 +155,14 @@ export function WorkflowConfig() {
                     value={settings.defaultVideoModel}
                     onChange={(e) => updateSettings({ defaultVideoModel: e.target.value })}
                   >
-                    <optgroup label="VEO 3.1系列（推荐）">
-                      <option value="veo3.1-fast">VEO 3.1 Fast ✓</option>
-                      <option value="veo3.1-pro">VEO 3.1 Pro ✓</option>
+                    <optgroup label="Kling 系列（推荐）">
+                      <option value="kling-v2-master">Kling V2 Master</option>
+                      <option value="kling-v2-1-master">Kling V2.1 Master</option>
+                      <option value="kling-v2-5-turbo">Kling V2.5 Turbo</option>
+                      <option value="kling-v3">Kling V3</option>
                     </optgroup>
-                    <optgroup label="VEO 3系列">
-                      <option value="veo3">VEO 3 ✓</option>
-                      <option value="veo3-fast">VEO 3 Fast ✓</option>
+                    <optgroup label="其他">
+                      <option value="veo-3.1">VEO 3.1</option>
                     </optgroup>
                   </select>
                 </div>

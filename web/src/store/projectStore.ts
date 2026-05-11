@@ -68,10 +68,10 @@ export const useProjectStore = create<ProjectState>()(
         style: 'realistic',
         aspectRatio: '16:9',
         defaultTextModel: 'deepseek-chat',
-        defaultImageModel: 'doubao-seedream-4-0-250828',  // 豆包图像模型（最快）
-        defaultVideoModel: 'doubao-seedance-1-0-lite-i2v-250428',  // 豆包视频模型（角色一致性最佳）
+        defaultImageModel: 'kling-v2',
+        defaultVideoModel: 'kling-v2-master',
         defaultAudioEngine: 'minimax',
-        defaultTTSModel: 'tts-1',  // TTS语音合成模型（最快）
+        defaultTTSModel: 'minimax-male-qn-jingying',
         defaultImageSize: '1920x1080',
         defaultVideoFPS: 24,
         apiKey: ''

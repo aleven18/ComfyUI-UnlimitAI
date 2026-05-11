@@ -277,11 +277,13 @@ def _register_v3_nodes():
             DramaConfigV3Node,
             ModelComparisonV3Node,
             CostEstimatorV3Node,
+            UnlimitAIApiConfigV3Node,
         )
         v3_nodes.extend([
             DramaConfigV3Node,
             ModelComparisonV3Node,
             CostEstimatorV3Node,
+            UnlimitAIApiConfigV3Node,
         ])
     except Exception:
         _logger.exception("Failed to register config_nodes_v3")

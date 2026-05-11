@@ -78,9 +78,26 @@ def parse_camera_control(camera_control_json: str) -> KlingCameraControl | None:
     config_raw = cc_data.get("config", {})
     if not isinstance(config_raw, dict):
         raise Exception("camera_control_json 'config' must be a JSON object.")
+    try:
+        config = KlingCameraConfig(**config_raw)
+    except Exception:
+        _CLAMPS = {
+            "horizontal": (-1.0, 1.0), "vertical": (-1.0, 1.0),
+            "pan": (-1.0, 1.0), "tilt": (-1.0, 1.0),
+            "roll": (-1.0, 1.0), "zoom": (-10.0, 10.0),
+        }
+        clamped = {}
+        for field_name, (lo, hi) in _CLAMPS.items():
+            val = config_raw.get(field_name, 0.0)
+            try:
+                val = max(lo, min(hi, float(val)))
+            except (ValueError, TypeError):
+                val = 0.0
+            clamped[field_name] = val
+        config = KlingCameraConfig(**clamped)
     return KlingCameraControl(
         type=cc_data.get("type", "simple"),
-        config=KlingCameraConfig(**config_raw),
+        config=config,
     )
 
 

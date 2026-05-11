@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { comfyUIClient } from '@/lib/comfyui-client';
 import { WorkflowManager } from '@/lib/workflow-manager';
 import { useAppStore } from '@/store';
-import { Shot } from '@/lib/storyboard-to-workflow';
+import { Shot } from '@/types/project';
 import { StoryboardToNovelConverter } from '@/lib/storyboard-to-novel';
 import { 
   executeWorkflowWithProgress, 
@@ -67,8 +67,8 @@ export function useComfyUI() {
       
       const workflowParams = StoryboardToNovelConverter.toWorkflowParams(novel, {
         apiKey,
-        imageModel: params.imageModel || 'flux-pro',
-        videoModel: params.videoModel || 'kling-v2',
+        imageModel: params.imageModel || 'kling-v2',
+        videoModel: params.videoModel || 'kling-v2-master',
         audioEnabled: true
       });
       

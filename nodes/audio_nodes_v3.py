@@ -164,8 +164,9 @@ class MinimaxVoiceCloneV3Node(IO.ComfyNode):
     @classmethod
     async def execute(cls, api_key: str = "", voice_name: str = "", audio_url: str = "", description: str = ""):
         validate_string(voice_name, field_name="voice_name")
+        validate_string(audio_url, field_name="audio_url")
         key = validate_api_key(api_key)
-        request = MinimaxVoiceCloneRequest(voice_name=voice_name, audio_url=audio_url or None, description=description or None)
+        request = MinimaxVoiceCloneRequest(voice_name=voice_name, audio_url=audio_url, description=description or None)
         response: MinimaxVoiceCloneResponse = await sync_op(cls, endpoint=ApiEndpoint(path="/v1/voice_clone", method="POST"), data=request, response_model=MinimaxVoiceCloneResponse, api_key=key, wait_label="Cloning voice", estimated_duration=15)
         return IO.NodeOutput(response.voice_id, response.voice_name)
 

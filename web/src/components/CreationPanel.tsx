@@ -148,6 +148,8 @@ export function CreationPanel() {
             <div className="max-w-full mx-auto">
               <StoryboardEditor 
                 novelText={novelText}
+                shots={[]}
+                onShotsChange={() => {}}
                 onStartGeneration={handleStartGeneration}
               />
             </div>

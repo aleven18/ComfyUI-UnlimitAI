@@ -29,8 +29,8 @@ const workflowModes = [
     description: '快速生成，成本优先',
     models: {
       text: 'gpt-4o-mini',
-      image: 'doubao-seedream-4-0-250828',
-      video: 'kling-v1'
+      image: 'kling-v2',
+      video: 'kling-v2-master'
     },
     color: 'text-yellow-500'
   },
@@ -41,8 +41,8 @@ const workflowModes = [
     description: '平衡质量与成本',
     models: {
       text: 'deepseek-chat',
-      image: 'doubao-seedream-4-0-250828',
-      video: 'doubao-seedance-1-0-lite-i2v-250428'
+      image: 'flux-pro',
+      video: 'kling-v2-master'
     },
     color: 'text-blue-500'
   },
@@ -53,7 +53,7 @@ const workflowModes = [
     description: '最高质量，不计成本',
     models: {
       text: 'gpt-4o',
-      image: 'doubao-seedream-4-0-250828',
+      image: 'kling-v2',
       video: 'kling-v3'
     },
     color: 'text-purple-500'
@@ -233,12 +233,16 @@ export function GlobalSettingsModal({ isOpen, onClose }: GlobalSettingsModalProp
                   <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">图像模型</label>
                   <select 
                     className="w-full h-10 px-3 text-sm bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
-                    value={settings.defaultImageModel || 'doubao-seedream-4-0-250828'}
+                    value={settings.defaultImageModel || 'kling-v2'}
                     onChange={(e) => updateSettings({ defaultImageModel: e.target.value })}
                   >
-                    <optgroup label="推荐模型">
-                      <option value="doubao-seedream-4-0-250828">🫘 豆包 Seedream 4.0 ✓</option>
-                      <option value="gpt-image-1-all">🍌 香蕉 GPT Image All ✓</option>
+                    <optgroup label="Kling 系列">
+                      <option value="kling-v2">Kling V2</option>
+                      <option value="kling-v3">Kling V3</option>
+                    </optgroup>
+                    <optgroup label="其他">
+                      <option value="flux-pro">Flux Pro</option>
+                      <option value="gpt-image">GPT Image</option>
                     </optgroup>
                   </select>
                   <p className="text-xs text-green-500 mt-1">✓ 已测试可用</p>
@@ -248,12 +252,19 @@ export function GlobalSettingsModal({ isOpen, onClose }: GlobalSettingsModalProp
                   <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">语音合成模型</label>
                   <select 
                     className="w-full h-10 px-3 text-sm bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
-                    value={settings.defaultTTSModel || 'tts-1'}
+                    value={settings.defaultTTSModel || 'minimax-male-qn-jingying'}
                     onChange={(e) => updateSettings({ defaultTTSModel: e.target.value })}
                   >
-                    <optgroup label="推荐模型">
-                      <option value="tts-1">TTS-1 ✓ (2.2秒)</option>
-                      <option value="tts-1-hd">TTS-1 HD ✓ (10.3秒)</option>
+                    <optgroup label="Minimax">
+                      <option value="minimax-male-qn-jingying">男声-精英</option>
+                      <option value="minimax-male-qn-qingse">男声-青涩</option>
+                      <option value="minimax-female-shaonv">女声-少女</option>
+                      <option value="minimax-female-yujie">女声-御姐</option>
+                    </optgroup>
+                    <optgroup label="Kling">
+                      <option value="kling-Binbin">Binbin (彬彬)</option>
+                      <option value="kling-Dashu">Dashu (大叔)</option>
+                      <option value="kling-Xiaomei">Xiaomei (小美)</option>
                     </optgroup>
                   </select>
                   <p className="text-xs text-green-500 mt-1">✓ 已测试可用</p>
@@ -263,30 +274,17 @@ export function GlobalSettingsModal({ isOpen, onClose }: GlobalSettingsModalProp
                   <label className="block text-xs text-[var(--text-tertiary)] mb-1.5">视频模型</label>
                   <select 
                     className="w-full h-10 px-3 text-sm bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
-                    value={settings.defaultVideoModel || 'doubao-seedance-1-0-lite-i2v-250428'}
+                    value={settings.defaultVideoModel || 'kling-v2-master'}
                     onChange={(e) => updateSettings({ defaultVideoModel: e.target.value })}
                   >
-                    <optgroup label="豆包系列（角色一致性最佳）">
-                      <option value="doubao-seedance-1-0-lite-i2v-250428">🫘 豆包 Seedance ✓ (36秒，支持1-4张参考图)</option>
+                    <optgroup label="Kling 系列（推荐）">
+                      <option value="kling-v2-master">Kling V2 Master</option>
+                      <option value="kling-v2-1-master">Kling V2.1 Master</option>
+                      <option value="kling-v2-5-turbo">Kling V2.5 Turbo</option>
+                      <option value="kling-v3">Kling V3</option>
                     </optgroup>
-                    <optgroup label="可灵系列（功能丰富）">
-                      <option value="kling-v1">🎬 可灵 V1 ✓ (180秒)</option>
-                      <option value="kling-v1-6">🎬 可灵 V1.6 ✓ (支持多图参考)</option>
-                      <option value="kling-v2-master">🎬 可灵 V2 Master ✓ (高品质)</option>
-                      <option value="kling-v2-5-turbo">🎬 可灵 V2.5 Turbo ✓ (快速)</option>
-                      <option value="kling-v3">🎬 可灵 V3 ✓ (最新)</option>
-                    </optgroup>
-                    <optgroup label="通义万象系列">
-                      <option value="wan2.5-i2v-preview">🌟 通义万象 I2V ✓ (60秒，自动音频)</option>
-                    </optgroup>
-                    <optgroup label="VEO 3.1系列">
-                      <option value="veo3.1-fast">VEO 3.1 Fast ✓ (155秒)</option>
-                      <option value="veo3.1-pro">VEO 3.1 Pro ✓ (130秒)</option>
-                      <option value="veo3.1">VEO 3.1 ✓ (标准)</option>
-                    </optgroup>
-                    <optgroup label="VEO 3系列">
-                      <option value="veo3-fast">VEO 3 Fast ✓ (174秒)</option>
-                      <option value="veo3">VEO 3 ✓ (287秒，带音频)</option>
+                    <optgroup label="其他">
+                      <option value="veo-3.1">VEO 3.1</option>
                     </optgroup>
                   </select>
                   <p className="text-xs text-green-500 mt-1">✓ 已测试可用（12个模型，含Kling系列）</p>

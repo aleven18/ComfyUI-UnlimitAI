@@ -3,8 +3,9 @@ import { useState } from 'react';
 const API_BASE_URL = 'https://api.unlimitai.org';
 
 const TEST_MODELS = [
-  { id: 'tts-1', name: 'TTS-1', description: '推荐：快速生成（2.2秒）' },
-  { id: 'tts-1-hd', name: 'TTS-1 HD', description: '高清音质（10.3秒）' }
+  { id: 'tts-1', name: 'OpenAI TTS-1', description: 'OpenAI 快速生成' },
+  { id: 'tts-1-hd', name: 'OpenAI TTS-1 HD', description: 'OpenAI 高清音质' },
+  { id: 'minimax', name: 'Minimax TTS', description: 'Minimax 中文语音' }
 ];
 
 interface TestResult {
@@ -42,7 +43,7 @@ export function TTSModelDiagnostic() {
         body: JSON.stringify({
           model: modelId,
           input: '测试语音合成',
-          voice: 'alloy'
+          voice: 'minimax-male-qn-jingying'
         })
       });
 

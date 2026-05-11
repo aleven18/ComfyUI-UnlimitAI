@@ -52,12 +52,12 @@ KLING_CUSTOM_ELEMENTS = "/kling/v1/general/custom-elements"
 
 
 class KlingCameraConfig(BaseModel):
-    horizontal: float = 0.0
-    vertical: float = 0.0
-    pan: float = 0.0
-    tilt: float = 0.0
-    roll: float = 0.0
-    zoom: float = 0.0
+    horizontal: float = Field(default=0.0, ge=-1.0, le=1.0)
+    vertical: float = Field(default=0.0, ge=-1.0, le=1.0)
+    pan: float = Field(default=0.0, ge=-1.0, le=1.0)
+    tilt: float = Field(default=0.0, ge=-1.0, le=1.0)
+    roll: float = Field(default=0.0, ge=-1.0, le=1.0)
+    zoom: float = Field(default=0.0, ge=-10.0, le=10.0)
 
 
 class KlingCameraControl(BaseModel):
@@ -69,6 +69,7 @@ class KlingMultiPromptItem(BaseModel):
     index: int
     prompt: str
     duration: str = "5"
+    camera_control: KlingCameraControl | None = None
 
 
 class KlingWatermarkInfo(BaseModel):

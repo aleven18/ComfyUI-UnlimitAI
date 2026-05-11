@@ -202,8 +202,6 @@ class KlingImageToVideoV3Node(IO.ComfyNode):
             raise Exception("End frame (image_tail) cannot be used with storyboards.")
         multi_shot, multi_prompt, shot_type = _parse_storyboard(storyboards, duration, model_name)
         camera_control = _parse_camera_control(camera_control_json)
-        if camera_control is not None:
-            camera_control.type = "simple"
         effective_sound = _validate_kling_sound(sound, model_name, "KlingImageToVideoV3")
         request = KlingImage2VideoRequest(
             model_name=model_name, prompt=prompt, image=resolved_image,
@@ -550,8 +548,8 @@ class KlingCameraControlV3Node(IO.ComfyNode):
 
     @classmethod
     async def execute(cls, camera_type: str = "simple", horizontal: float = 0.0, vertical: float = 0.0, pan: float = 0.0, tilt: float = 0.0, roll: float = 0.0, zoom: float = 0.0):
-        if all(math.isclose(v, 0.0) for v in [horizontal, vertical, pan, tilt, roll, zoom]):
-            raise Exception("At least one camera axis value must be non-zero.")
+        if camera_type == "simple" and all(math.isclose(v, 0.0) for v in [horizontal, vertical, pan, tilt, roll, zoom]):
+            raise Exception("At least one camera axis value must be non-zero when using 'simple' type.")
         result = {
             "type": camera_type,
             "config": {
@@ -900,6 +898,8 @@ class RunwayGen4V3Node(IO.ComfyNode):
         validate_string(prompt, field_name="prompt")
         key = validate_api_key(api_key)
         resolved_image = prepare_image_input(image=image, image_url=image_url)
+        if image_url and not resolved_image and not image:
+            raise Exception(f"image_url does not appear to be a valid URL (must start with http://, https://, or data:): {image_url[:80]}")
         request = RunwayGen4Request(prompt=prompt, model=model, ratio=ratio, duration=duration, image_url=resolved_image)
         submit: RunwaySubmitResponse = await sync_op(cls, endpoint=ApiEndpoint(path="/runway/v1/image_to_video", method="POST"), data=request, response_model=RunwaySubmitResponse, api_key=key, wait_label="Submitting", estimated_duration=5)
         status_url = submit.status_url

@@ -7,7 +7,7 @@ class RunwayGen4Request(BaseModel):
     prompt: str
     model: str = "gen4_turbo"
     ratio: str = "16:9"
-    duration: int = 5
+    duration: int = Field(default=5, ge=5, le=10)
     image_url: str | None = None
 
 

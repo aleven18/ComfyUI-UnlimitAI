@@ -3,10 +3,13 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+from typing import Literal
+
+
 class Imagen4Request(BaseModel):
     prompt: str
-    aspect_ratio: str = "1:1"
-    output_format: str = "png"
+    aspect_ratio: Literal["1:1", "16:9", "9:16", "4:3", "3:4"] = "1:1"
+    output_format: Literal["png", "jpeg"] = "png"
     person_generation: str = "allow_adult"
 
 

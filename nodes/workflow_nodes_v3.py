@@ -28,12 +28,16 @@ from ..apis.kling import (
     KLING_IMAGE_GEN_POLL,
     KLING_IMAGE2VIDEO,
     KLING_IMAGE2VIDEO_POLL,
+    KLING_MULTI_IMAGE2IMAGE,
+    KLING_MULTI_IMAGE2IMAGE_POLL,
     KLING_TEXT2VIDEO,
     KLING_TEXT2VIDEO_POLL,
     KlingCameraConfig,
     KlingCameraControl,
     KlingImage2VideoRequest,
     KlingImageGenRequest,
+    KlingMultiImage2ImageRequest,
+    KlingMultiImage2ImageSubjectItem,
     KlingText2VideoRequest,
     KlingMultiPromptItem,
     KlingSubmitResponse,
@@ -328,7 +332,7 @@ class SceneImageGeneratorV3Node(IO.ComfyNode):
             return IO.NodeOutput(json.dumps({"images": []}), "No scenes to process")
 
         resolved_ref = None
-        if image_model == "kling-v2" and image_reference != "none":
+        if image_model.startswith("kling") and image_reference != "none":
             resolved_ref = prepare_image_input(image=ref_image, image_url=ref_image_url)
 
         ctx = AsyncWorkflowContext()
@@ -368,10 +372,10 @@ class SceneImageGeneratorV3Node(IO.ComfyNode):
                 continue
 
             try:
-                if image_model == "kling-v2":
+                if image_model.startswith("kling"):
                     has_ref = image_reference != "none" and resolved_ref
                     request = KlingImageGenRequest(
-                        model_name="kling-v2", prompt=prompt, aspect_ratio=aspect_ratio, n=1,
+                        model_name=image_model, prompt=prompt, aspect_ratio=aspect_ratio, n=1,
                         image=resolved_ref if has_ref else None,
                         image_reference=image_reference if has_ref else None,
                         image_fidelity=image_fidelity if has_ref else None,
@@ -411,9 +415,12 @@ class SceneImageGeneratorV3Node(IO.ComfyNode):
                     data_list = response.get("data", []) if isinstance(response, dict) else []
                     img_url = data_list[0].get("url", "") if data_list and isinstance(data_list[0], dict) else ""
 
-                results.append({"scene_number": scene_number, "image_url": img_url, "visual_prompt": prompt, "status": "success"})
-                ctx.store_content_duplicate("image", content_key, img_url)
-                ctx.record_result(True)
+                if not img_url:
+                    results.append({"scene_number": scene_number, "image_url": "", "visual_prompt": prompt, "status": "error", "reason": "no_image_url"})
+                else:
+                    results.append({"scene_number": scene_number, "image_url": img_url, "visual_prompt": prompt, "status": "success"})
+                    ctx.store_content_duplicate("image", content_key, img_url)
+                    ctx.record_result(True)
                 await ctx.apply_smart_delay("image", is_last=is_last)
 
             except Exception as e:
@@ -463,11 +470,11 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
         if not images:
             return IO.NodeOutput(json.dumps({"videos": []}), "No images to process")
 
-        if storyboard_mode == "combine_scenes" and video_model == "kling-v2":
-            return await cls._execute_combine_storyboard(key, images, duration, aspect_ratio)
+        if storyboard_mode == "combine_scenes" and video_model.startswith("kling"):
+            return await cls._execute_combine_storyboard(key, images, duration, aspect_ratio, video_model)
 
-        if storyboard_mode == "combine_scenes" and video_model != "kling-v2":
-            logger.warning(f"[SCENE_VIDEO] storyboard_mode='combine_scenes' requires kling-v2, got '{video_model}'; ignoring storyboard_mode")
+        if storyboard_mode == "combine_scenes" and not video_model.startswith("kling"):
+            logger.warning(f"[SCENE_VIDEO] storyboard_mode='combine_scenes' requires a Kling model, got '{video_model}'; ignoring storyboard_mode")
 
         ctx = AsyncWorkflowContext()
         results = []
@@ -505,7 +512,8 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
                 ctx.update_progress("video_batch", f"Scene {scene_number}", completed=idx + 1)
                 continue
 
-            payload = {"prompt": "Animate this scene with natural movement and atmosphere", "image": image_url, "duration": duration, "aspect_ratio": aspect_ratio}
+            scene_prompt = img.get('visual_prompt', '') or 'Animate this scene with natural movement and atmosphere'
+            payload = {"prompt": scene_prompt, "image": image_url, "duration": duration, "aspect_ratio": aspect_ratio}
 
             try:
                 if video_model == "kling-v2":
@@ -561,9 +569,12 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
                     else:
                         video_url = ""
 
-                results.append({"scene_number": scene_number, "video_url": video_url, "status": "success"})
-                ctx.store_content_duplicate("video", content_key, video_url)
-                ctx.record_result(True)
+                if not video_url:
+                    results.append({"scene_number": scene_number, "video_url": "", "status": "error", "reason": "no_video_url"})
+                else:
+                    results.append({"scene_number": scene_number, "video_url": video_url, "status": "success"})
+                    ctx.store_content_duplicate("video", content_key, video_url)
+                    ctx.record_result(True)
                 await ctx.apply_smart_delay("video", is_last=is_last)
 
             except Exception as e:
@@ -584,7 +595,7 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
         return IO.NodeOutput(output, summary)
 
     @classmethod
-    async def _execute_combine_storyboard(cls, key: str, images: list, duration: str, aspect_ratio: str):
+    async def _execute_combine_storyboard(cls, key: str, images: list, duration: str, aspect_ratio: str, video_model: str = "kling-v2-master"):
         num_scenes = len(images)
         total_duration = int(duration)
         seg_duration = total_duration // num_scenes
@@ -599,15 +610,34 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
             multi_prompt.append(KlingMultiPromptItem(index=i + 1, prompt=prompt[:512], duration=str(d)))
 
         combined_prompt = " ; ".join(mp.prompt for mp in multi_prompt)
-        request = KlingText2VideoRequest(
-            model_name="kling-v2-master", prompt=combined_prompt,
-            duration=duration, aspect_ratio=aspect_ratio,
-            cfg_scale=0.5, mode="std",
-            multi_shot=True, shot_type="customize", multi_prompt=multi_prompt,
-        )
+        first_image_url = ""
+        for img in images:
+            url = img.get("image_url", "")
+            if url:
+                first_image_url = url
+                break
+
+        if first_image_url:
+            request = KlingImage2VideoRequest(
+                model_name=video_model, prompt=combined_prompt,
+                image=first_image_url, duration=duration, aspect_ratio=aspect_ratio,
+                cfg_scale=0.5, mode="std",
+                multi_shot=True, shot_type="customize", multi_prompt=multi_prompt,
+            )
+            submit_path = KLING_IMAGE2VIDEO
+            poll_path = KLING_IMAGE2VIDEO_POLL
+        else:
+            request = KlingText2VideoRequest(
+                model_name=video_model, prompt=combined_prompt,
+                duration=duration, aspect_ratio=aspect_ratio,
+                cfg_scale=0.5, mode="std",
+                multi_shot=True, shot_type="customize", multi_prompt=multi_prompt,
+            )
+            submit_path = KLING_TEXT2VIDEO
+            poll_path = KLING_TEXT2VIDEO_POLL
 
         submit: KlingSubmitResponse = await sync_op(
-            cls, endpoint=ApiEndpoint(path=KLING_TEXT2VIDEO, method="POST"),
+            cls, endpoint=ApiEndpoint(path=submit_path, method="POST"),
             data=request, response_model=KlingSubmitResponse, api_key=key,
             wait_label="Submitting storyboard video", estimated_duration=5,
         )
@@ -616,7 +646,7 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
             raise Exception(f"Kling storyboard submit failed: {submit}")
 
         poll_response: KlingPollResponse = await poll_op(
-            cls, poll_endpoint=ApiEndpoint(path=KLING_TEXT2VIDEO_POLL.format(task_id), method="GET"),
+            cls, poll_endpoint=ApiEndpoint(path=poll_path.format(task_id), method="GET"),
             response_model=KlingPollResponse, status_extractor=kling_status_extractor,
             api_key=key, completed_statuses=["succeed"], failed_statuses=["failed"],
             queued_statuses=["submitted", "processing"], poll_interval=10.0,
@@ -932,7 +962,7 @@ MINIMAX_VOICE_OPTIONS = [
 ]
 
 ALL_VOICE_OPTIONS = MINIMAX_VOICE_OPTIONS + [
-    "kling-alloy", "kling-echo", "kling-fable", "kling-onyx", "kling-nova", "kling-shimmer",
+    "kling-Binbin", "kling-Dashu", "kling-Xiaomei", "kling-Aibo", "kling-Yezi",
 ]
 
 
@@ -1006,7 +1036,7 @@ def _parse_camera_values_from_segment(seg: dict) -> KlingCameraConfig | None:
             roll=float(cv.get("roll", 0.0)),
             zoom=float(cv.get("zoom", 0.0)),
         )
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, Exception):
         return None
 
 
@@ -1286,7 +1316,7 @@ Output ONLY the JSON array:"""
             model=text_model,
             messages=[ChatMessage(role="user", content=step2_prompt)],
             temperature=0.7, max_tokens=4096,
-            response_format={"type": "json_object"},
+            response_format={"type": "json_object"} if text_model in VISION_MODELS else None,
         )
         step2_response: TextGenerationResponse = await sync_op(
             cls, endpoint=ApiEndpoint(path="/v1/chat/completions", method="POST"),
@@ -1301,7 +1331,9 @@ Output ONLY the JSON array:"""
         segments_data = parse_json_safe(segments_text, "segments")
         segments = segments_data if isinstance(segments_data, list) else []
         if not segments:
-            segments = [{"prompt": story_description, "duration": int(duration)}]
+            base_dur = int(duration) // max(storyboard_count, 1)
+            segments = [{"prompt": story_description, "duration": base_dur} for _ in range(storyboard_count)]
+            logger.warning("[STORYBOARD_PRO] Step 2 parsing failed, using %d equal segments as fallback", storyboard_count)
 
         total_seg_duration = sum(int(s.get("duration", 0)) for s in segments)
         if total_seg_duration != int(duration):
@@ -1332,16 +1364,27 @@ Output ONLY the JSON array:"""
         # P2: Determine camera_control
         camera_control: KlingCameraControl | None = None
         if camera_style == "simple":
-            cam_text = segments[0].get("camera", "") if segments else ""
-            cam_config = _map_camera_text_to_preset(cam_text)
-            if cam_config:
-                camera_control = KlingCameraControl(type="simple", config=cam_config)
-                logger.info("[STORYBOARD_PRO] Camera (simple): mapped '%s' → %s", cam_text, cam_config)
+            for seg in segments:
+                cam_text = seg.get("camera", "")
+                if cam_text:
+                    cam_config = _map_camera_text_to_preset(cam_text)
+                    if cam_config:
+                        camera_control = KlingCameraControl(type="simple", config=cam_config)
+                        logger.info("[STORYBOARD_PRO] Camera (simple): mapped '%s' → %s", cam_text, cam_config)
+                        break
+            if not camera_control and segments:
+                cam_text = segments[0].get("camera", "")
+                cam_config = _map_camera_text_to_preset(cam_text)
+                if cam_config:
+                    camera_control = KlingCameraControl(type="simple", config=cam_config)
+                    logger.info("[STORYBOARD_PRO] Camera (simple): mapped '%s' → %s", cam_text, cam_config)
         elif camera_style == "custom":
-            cam_config = _parse_camera_values_from_segment(segments[0]) if segments else None
-            if cam_config:
-                camera_control = KlingCameraControl(type="simple", config=cam_config)
-                logger.info("[STORYBOARD_PRO] Camera (custom): %s", cam_config)
+            for seg in segments:
+                cam_config = _parse_camera_values_from_segment(seg)
+                if cam_config:
+                    camera_control = KlingCameraControl(type="simple", config=cam_config)
+                    logger.info("[STORYBOARD_PRO] Camera (custom): %s", cam_config)
+                    break
 
         # Step 3/6: Generate storyboard image (P1: use SETTING from master_prompt)
         storyboard_image_url = ""
@@ -1352,8 +1395,29 @@ Output ONLY the JSON array:"""
         if setting_prompt:
             logger.info("[STORYBOARD_PRO] Using SETTING-based prompt for reference image")
         try:
-            ref_url = char_urls[0] if char_urls else ""
-            if image_model.startswith("kling"):
+            if image_model.startswith("kling") and len(char_urls) > 1:
+                subject_list = [KlingMultiImage2ImageSubjectItem(subject_image=url) for url in char_urls]
+                img_request = KlingMultiImage2ImageRequest(
+                    model_name=image_model, prompt=ref_prompt, aspect_ratio=aspect_ratio, n=1,
+                    subject_image_list=subject_list,
+                )
+                img_submit: KlingSubmitResponse = await sync_op(
+                    cls, endpoint=ApiEndpoint(path=KLING_MULTI_IMAGE2IMAGE, method="POST"),
+                    data=img_request, response_model=KlingSubmitResponse, api_key=key,
+                    wait_label="Step 3/6: Submitting storyboard image (multi-ref)", estimated_duration=5)
+                img_task_id = img_submit.data.task_id if img_submit.data else ""
+                if img_task_id:
+                    img_poll: KlingPollResponse = await poll_op(
+                        cls, poll_endpoint=ApiEndpoint(path=KLING_MULTI_IMAGE2IMAGE_POLL.format(img_task_id), method="GET"),
+                        response_model=KlingPollResponse, status_extractor=kling_status_extractor,
+                        api_key=key, completed_statuses=["succeed"], failed_statuses=["failed"],
+                        queued_statuses=["submitted", "processing"],
+                        poll_interval=3.0, max_poll_attempts=200, estimated_duration=60)
+                    img_data = img_poll.data
+                    if img_data and img_data.task_result and img_data.task_result.images:
+                        storyboard_image_url = img_data.task_result.images[0].url
+            elif image_model.startswith("kling"):
+                ref_url = char_urls[0] if char_urls else ""
                 kling_model = image_model
                 img_request = KlingImageGenRequest(
                     model_name=kling_model, prompt=ref_prompt, aspect_ratio=aspect_ratio, n=1,
@@ -1399,6 +1463,26 @@ Output ONLY the JSON array:"""
                     data=flux_request, response_model=FluxProResponse, api_key=key,
                     wait_label="Step 3/6: Generating storyboard image (FLUX)", estimated_duration=15)
                 storyboard_image_url = flux_response.images[0].url if flux_response.images else ""
+            elif image_model == "ideogram-v3":
+                _ideo_ar_map = {"16:9": "ASPECT_16_9", "9:16": "ASPECT_9_16", "1:1": "ASPECT_1_1"}
+                ideo_payload = {"prompt": ref_prompt, "aspect_ratio": _ideo_ar_map.get(aspect_ratio, "ASPECT_16_9"), "model": "ideogram-v3", "output_format": "jpeg", "enable_safety_checker": True, "sync": True}
+                ideo_response = await sync_op_raw(
+                    cls, endpoint=ApiEndpoint(path="/v1/ideogram/generate", method="POST"),
+                    data=ideo_payload, api_key=key,
+                    wait_label="Step 3/6: Generating storyboard image (Ideogram)", estimated_duration=12)
+                if isinstance(ideo_response, dict):
+                    data_list = ideo_response.get("data", [])
+                    storyboard_image_url = data_list[0].get("url", "") if data_list and isinstance(data_list[0], dict) else ""
+            elif image_model == "dall-e-3":
+                _dalle_size_map = {"16:9": "1792x1024", "9:16": "1024x1792", "1:1": "1024x1024"}
+                dalle_payload = {"prompt": ref_prompt, "model": "dall-e-3", "size": _dalle_size_map.get(aspect_ratio, "1792x1024")}
+                dalle_response = await sync_op_raw(
+                    cls, endpoint=ApiEndpoint(path="/v1/images/generations", method="POST"),
+                    data=dalle_payload, api_key=key,
+                    wait_label="Step 3/6: Generating storyboard image (DALL-E)", estimated_duration=15)
+                if isinstance(dalle_response, dict):
+                    data_list = dalle_response.get("data", [])
+                    storyboard_image_url = data_list[0].get("url", "") if data_list and isinstance(data_list[0], dict) else ""
             else:
                 logger.warning(f"[STORYBOARD_PRO] Unknown image_model '{image_model}', skipping Step 3")
         except Exception as e:
