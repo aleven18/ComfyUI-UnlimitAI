@@ -134,12 +134,13 @@ class KlingVideoV3Node(IO.ComfyNode):
         key = validate_api_key(api_key)
         multi_shot, multi_prompt, shot_type = _parse_storyboard(storyboards, duration, model_name)
         camera_control = _parse_camera_control(camera_control_json)
+        effective_sound = _validate_kling_sound(sound, model_name, "KlingVideoV3")
         request = KlingText2VideoRequest(
             model_name=model_name, prompt=prompt, duration=duration,
             aspect_ratio=aspect_ratio, cfg_scale=cfg_scale, mode=mode,
             negative_prompt=negative_prompt or None,
             multi_shot=multi_shot, shot_type=shot_type, multi_prompt=multi_prompt,
-            sound=sound if sound != "off" else None,
+            sound=effective_sound,
             camera_control=camera_control,
         )
         video_output, task_id = await _kling_submit_poll_download(
@@ -203,12 +204,13 @@ class KlingImageToVideoV3Node(IO.ComfyNode):
         camera_control = _parse_camera_control(camera_control_json)
         if camera_control is not None:
             camera_control.type = "simple"
+        effective_sound = _validate_kling_sound(sound, model_name, "KlingImageToVideoV3")
         request = KlingImage2VideoRequest(
             model_name=model_name, prompt=prompt, image=resolved_image,
             image_tail=resolved_tail or None, duration=duration,
             cfg_scale=cfg_scale, mode=mode, aspect_ratio=aspect_ratio,
             negative_prompt=negative_prompt or None,
-            sound=sound if sound != "off" else None,
+            sound=effective_sound,
             multi_shot=multi_shot, shot_type=shot_type, multi_prompt=multi_prompt,
             camera_control=camera_control,
         )
@@ -353,12 +355,13 @@ class KlingOmniVideoV3Node(IO.ComfyNode):
         vid_list = None
         if video_urls:
             vid_list = [KlingOmniVideoVideoItem(video_url=u.strip()) for u in video_urls.strip().split("\n") if u.strip()]
+        effective_sound = _validate_kling_sound(sound, model_name, "KlingOmniVideoV3")
         request = KlingOmniVideoRequest(
             model_name=model_name, prompt=prompt,
             image_list=img_list if img_list else None,
             video_list=vid_list,
             mode=mode, duration=duration, aspect_ratio=aspect_ratio,
-            sound=sound if sound != "off" else None,
+            sound=effective_sound,
             multi_shot=multi_shot, shot_type=shot_type, multi_prompt=multi_prompt,
         )
         video_output, task_id = await _kling_submit_poll_download(

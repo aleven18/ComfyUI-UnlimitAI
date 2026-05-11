@@ -40,6 +40,7 @@ from ..apis.kling import (
     KlingPollResponse,
     kling_status_extractor,
 )
+from ..nodes.video_nodes_v3 import _validate_kling_sound
 from ..apis.minimax import MinimaxTTSRequest, MinimaxTTSResponse
 from ..apis.text import TextGenerationRequest, TextGenerationResponse, ChatMessage, extract_text_content
 from ..utils.smart_skip import SmartSkipper
@@ -304,7 +305,7 @@ class SceneImageGeneratorV3Node(IO.ComfyNode):
             inputs=[
                 IO.String.Input("api_key", default="", multiline=False, tooltip="UnlimitAI API key."),
                 IO.String.Input("scenes_json", multiline=True, default="", tooltip="Scenes JSON from Novel to Drama."),
-                IO.Combo.Input("image_model", options=["flux-pro", "ideogram-v3", "kling-v2", "dall-e-3"], default="flux-pro"),
+                IO.Combo.Input("image_model", options=["flux-pro", "ideogram-v3", "kling-v2", "kling-v3", "dall-e-3", "gpt-image"], default="flux-pro"),
                 IO.Combo.Input("aspect_ratio", options=["16:9", "9:16", "1:1"], default="16:9"),
                 IO.Int.Input("max_scenes", default=10, min=1, max=50, step=1),
                 IO.Image.Input("ref_image", optional=True, tooltip="Reference image for character consistency (Kling only)."),
@@ -1198,7 +1199,7 @@ Output ONLY the JSON array, no other text."""
                 IO.Float.Input("image_fidelity", default=0.5, min=0.0, max=1.0, step=0.01, tooltip="Reference image intensity."),
                 IO.Float.Input("human_fidelity", default=0.45, min=0.0, max=1.0, step=0.01, tooltip="Subject similarity strength."),
                 IO.Combo.Input("text_model", options=["gpt-4o", "gpt-4o-mini", "deepseek-chat", "claude-3-5-sonnet-20241022"], default="gpt-4o", tooltip="LLM model for prompt generation."),
-                IO.Combo.Input("image_model", options=["kling-v2", "kling-v3", "flux-pro", "gpt-image"], default="kling-v2", tooltip="Image generation model for storyboard frame."),
+                IO.Combo.Input("image_model", options=["kling-v2", "kling-v3", "flux-pro", "ideogram-v3", "dall-e-3", "gpt-image"], default="kling-v2", tooltip="Image generation model for storyboard frame."),
                 IO.Combo.Input("video_model", options=["kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo", "kling-v3"], default="kling-v2-master", tooltip="Video generation model."),
                 IO.Int.Input("storyboard_count", default=4, min=2, max=6, step=1, tooltip="Number of storyboard segments (2-6)."),
                 IO.Combo.Input("duration", options=["5", "10"], default="5", tooltip="Total video duration in seconds."),
@@ -1230,9 +1231,12 @@ Output ONLY the JSON array, no other text."""
                       storyboard_count: int = 4, duration: str = "5", aspect_ratio: str = "16:9",
                       cfg_scale: float = 0.5, mode: str = "std", negative_prompt: str = "", sound: str = "off",
                       camera_style: str = "none", voice: str = "minimax-male-qn-jingying", generate_dialogue: str = "off"):
-        validate_string(story_description, field_name="story_description")
+        validate_string(story_description, field_name="story_description", max_length=2000)
         key = validate_api_key(api_key)
         char_urls = [u.strip() for u in character_image_urls.strip().split("\n") if u.strip()]
+        for i, url in enumerate(char_urls):
+            if not url.startswith(("http://", "https://")):
+                raise Exception(f"character_image_urls line {i+1} is not a valid URL (must start with http:// or https://): {url[:80]}")
 
         VISION_MODELS = {"gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet-20241022"}
         effective_text_model = text_model
@@ -1260,7 +1264,11 @@ Output ONLY the JSON array, no other text."""
             cls, endpoint=ApiEndpoint(path="/v1/chat/completions", method="POST"),
             data=step1_request, response_model=TextGenerationResponse, api_key=key,
             wait_label="Step 1/6: Analyzing characters", estimated_duration=20)
-        master_prompt = extract_text_content(step1_response.choices[0].message.content) if step1_response.choices else ""
+        if not step1_response.choices:
+            raise Exception("Step 1 failed: LLM returned no response.")
+        if step1_response.choices[0].finish_reason == "length":
+            logger.warning("[STORYBOARD_PRO] Step 1 output truncated (finish_reason=length). Consider increasing max_tokens or shortening the story description.")
+        master_prompt = extract_text_content(step1_response.choices[0].message.content)
 
         # Step 2/6: LLM → segment video prompts + dialogue + camera
         logger.info("[STORYBOARD_PRO] STEP 2/6: Generating video script...")
@@ -1278,12 +1286,17 @@ Output ONLY the JSON array:"""
             model=text_model,
             messages=[ChatMessage(role="user", content=step2_prompt)],
             temperature=0.7, max_tokens=4096,
+            response_format={"type": "json_object"},
         )
         step2_response: TextGenerationResponse = await sync_op(
             cls, endpoint=ApiEndpoint(path="/v1/chat/completions", method="POST"),
             data=step2_request, response_model=TextGenerationResponse, api_key=key,
             wait_label="Step 2/6: Generating video script", estimated_duration=20)
-        segments_text = extract_text_content(step2_response.choices[0].message.content) if step2_response.choices else ""
+        if not step2_response.choices:
+            raise Exception("Step 2 failed: LLM returned no response.")
+        if step2_response.choices[0].finish_reason == "length":
+            logger.warning("[STORYBOARD_PRO] Step 2 output truncated (finish_reason=length). Segment prompts may be incomplete. Consider reducing storyboard_count or increasing max_tokens.")
+        segments_text = extract_text_content(step2_response.choices[0].message.content)
 
         segments_data = parse_json_safe(segments_text, "segments")
         segments = segments_data if isinstance(segments_data, list) else []
@@ -1416,6 +1429,7 @@ Output ONLY the JSON array:"""
         # Step 5/6: Generate storyboard video
         logger.info("[STORYBOARD_PRO] STEP 5/6: Generating storyboard video...")
         combined_prompt = " ; ".join(mp.prompt for mp in multi_prompt)
+        effective_sound = _validate_kling_sound(sound, video_model, "StoryboardProV3")
 
         if storyboard_image_url:
             video_request = KlingImage2VideoRequest(
@@ -1423,7 +1437,7 @@ Output ONLY the JSON array:"""
                 image=storyboard_image_url, duration=duration,
                 aspect_ratio=aspect_ratio, cfg_scale=cfg_scale, mode=mode,
                 negative_prompt=final_negative or None,
-                sound=sound if sound != "off" else None,
+                sound=effective_sound,
                 multi_shot=True, shot_type="customize", multi_prompt=multi_prompt,
                 camera_control=camera_control,
             )
@@ -1435,7 +1449,7 @@ Output ONLY the JSON array:"""
                 duration=duration, aspect_ratio=aspect_ratio,
                 cfg_scale=cfg_scale, mode=mode,
                 negative_prompt=final_negative or None,
-                sound=sound if sound != "off" else None,
+                sound=effective_sound,
                 multi_shot=True, shot_type="customize", multi_prompt=multi_prompt,
                 camera_control=camera_control,
             )

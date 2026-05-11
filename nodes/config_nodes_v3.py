@@ -31,7 +31,7 @@ class DramaConfigV3Node(IO.ComfyNode):
                 IO.Combo.Input("text_model", options=["deepseek-chat", "gpt-4o", "claude-3-5-sonnet-20241022"], default="deepseek-chat"),
                 IO.Combo.Input("target_language", options=["english", "chinese"], default="english"),
                 IO.Combo.Input("art_style", options=["cinematic", "anime", "realistic", "artistic"], default="cinematic"),
-                IO.Combo.Input("image_model", options=["flux-pro", "ideogram-v3", "kling-v2", "dall-e-3"], default="flux-pro"),
+                IO.Combo.Input("image_model", options=["flux-pro", "ideogram-v3", "kling-v2", "kling-v3", "dall-e-3", "gpt-image"], default="flux-pro"),
                 IO.Combo.Input("image_aspect_ratio", options=["16:9", "9:16", "1:1"], default="16:9"),
                 IO.Combo.Input("video_model", options=["kling-v2", "veo-3.1", "vidu2", "hailuo"], default="kling-v2"),
                 IO.Combo.Input("video_duration", options=["5", "10"], default="5"),
