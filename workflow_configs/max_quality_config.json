@@ -1,0 +1,139 @@
+{
+  "name": "MAX_QUALITY",
+  "display_name": "👑 最佳质量配置",
+  "description": "无妥协的最高质量，适合顶级商业项目和电影级制作",
+  "quality_level": 5,
+  "estimated_cost": 6.15,
+  "estimated_time": "25 minutes",
+  
+  "models": {
+    "text": {
+      "model": "claude-opus-4-20250514",
+      "endpoint": "/v1/chat/completions",
+      "quality": 5,
+      "cost": 0.75,
+      "params": {
+        "temperature": 0.7,
+        "max_tokens": 8000
+      },
+      "features": {
+        "strongest_reasoning": true,
+        "best_chinese_understanding": true,
+        "creative_writing": "top"
+      }
+    },
+    
+    "image": {
+      "model": "imagen-4.0-generate-preview-05-20",
+      "endpoint": "/api/v1/imagen/generate",
+      "quality": 5,
+      "cost_per_image": 0.04,
+      "params": {
+        "aspect_ratio": "16:9",
+        "sample_count": 1,
+        "negative_prompt": "blur, low quality, distorted, watermark"
+      },
+      "features": {
+        "resolution": "4K",
+        "text_rendering": "best",
+        "detail_level": "highest"
+      }
+    },
+    
+    "video": {
+      "model": "kling-v2",
+      "endpoint": "/v1/videos/kling/image-to-video",
+      "quality": 4,
+      "cost_per_video": 0.30,
+      "params": {
+        "duration": "10s",
+        "cfg_scale": 0.5
+      },
+      "features": {
+        "image_to_video": true,
+        "digital_human": true,
+        "lip_sync": true,
+        "consistency": "perfect"
+      },
+      "note": "选择 Kling v2 而非 VEO 3.1，因为 VEO 3.1 不支持图生视频，会导致图像和视频不一致"
+    },
+    
+    "audio": {
+      "model": "speech-02-turbo",
+      "endpoint": "/v1/audio/speech",
+      "quality": 5,
+      "cost_per_char": 0.001,
+      "params": {
+        "voice": "male-qn-jingying",
+        "response_format": "mp3",
+        "speed": 1.0
+      },
+      "features": {
+        "emotion_tags": ["(laughs)", "(sighs)", "(breath)"],
+        "chinese_optimized": true,
+        "quality": "best_for_chinese"
+      }
+    },
+    
+    "music": {
+      "model": "suno-custom",
+      "endpoint": "/api/v1/suno/custom",
+      "quality": 5,
+      "cost_per_track": 0.10,
+      "params": {
+        "tags": ["cinematic", "orchestral", "emotional"],
+        "make_instrumental": true,
+        "duration": 90
+      },
+      "features": {
+        "style_control": true,
+        "emotion_matching": true
+      }
+    }
+  },
+  
+  "cost_breakdown": {
+    "text_analysis": 0.75,
+    "image_generation": 0.40,
+    "video_generation": 3.00,
+    "audio_synthesis": 1.00,
+    "background_music": 1.00,
+    "total": 6.15
+  },
+  
+  "quality_scores": {
+    "text_understanding": 5,
+    "image_quality": 5,
+    "video_quality": 4,
+    "audio_quality": 5,
+    "music_quality": 5,
+    "consistency": 5,
+    "overall": 5
+  },
+  
+  "use_cases": [
+    "顶级商业项目",
+    "电影级制作",
+    "最高要求场景"
+  ],
+  
+  "pros": [
+    "文本理解最强 (Claude Opus 4)",
+    "4K图像质量 (Imagen 4)",
+    "完美一致性 (图生视频)",
+    "中文语音最佳 (Minimax)",
+    "可控音乐风格 (Suno Custom)"
+  ],
+  
+  "cons": [
+    "成本最高 ($6.15)",
+    "视频不是4K (Kling v2 限制)",
+    "不自动生成环境音"
+  ],
+  
+  "notes": [
+    "VEO 3.1 不支持图生视频，会导致图像和视频不一致",
+    "选择 Kling v2 图生视频保证一致性",
+    "如需环境音，需要额外生成并手动混合"
+  ]
+}

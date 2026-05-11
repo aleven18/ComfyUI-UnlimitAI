@@ -1,0 +1,263 @@
+{
+  "last_node_id": 6,
+  "last_link_id": 8,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "NovelToDramaWorkflowNode",
+      "pos": [100, 100],
+      "size": [600, 400],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "properties": {
+        "Node name": "1_Novel_Analyzer"
+      },
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        "第一章 相遇\n\n春日的阳光透过梧桐树叶洒落在街道上，林晓薇匆匆走在去公司的路上。她没注意到，一辆黑色轿车正缓缓驶来...\n\n\"小心！\"\n\n一个低沉的男声响起，林晓薇被拉入一个温暖的怀抱。她抬头，看到一双深邃的眼眸。\n\n\"你没事吧？\"男人关切地问道。\n\n林晓薇愣住了，这个男人有着俊朗的面容...\"我叫陆晨轩。\"\n\n这一刻，命运的齿轮开始转动...",
+        10,
+        "deepseek-chat",
+        "english",
+        "cinematic"
+      ],
+      "outputs": [
+        {
+          "name": "scenes_json",
+          "type": "STRING",
+          "links": [1, 2, 3],
+          "slot_index": 0
+        },
+        {
+          "name": "summary",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "total_cost",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "title": "1. 小说分析"
+    },
+    {
+      "id": 2,
+      "type": "SceneImageGeneratorNode",
+      "pos": [800, 100],
+      "size": [600, 350],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "properties": {
+        "Node name": "2_Image_Generator"
+      },
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        "",
+        "flux-pro",
+        "16:9",
+        10
+      ],
+      "inputs": [
+        {
+          "name": "scenes_json",
+          "type": "STRING",
+          "link": 1,
+          "slot_index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images_json",
+          "type": "STRING",
+          "links": [4, 5],
+          "slot_index": 0
+        },
+        {
+          "name": "summary",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "2. 批量生成图像"
+    },
+    {
+      "id": 3,
+      "type": "SceneVideoGeneratorNode",
+      "pos": [1500, 100],
+      "size": [600, 350],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "properties": {
+        "Node name": "3_Video_Generator"
+      },
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        "",
+        "kling-v2",
+        "5",
+        "16:9"
+      ],
+      "inputs": [
+        {
+          "name": "images_json",
+          "type": "STRING",
+          "link": 4,
+          "slot_index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "name": "videos_json",
+          "type": "STRING",
+          "links": [6],
+          "slot_index": 0
+        },
+        {
+          "name": "summary",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "3. 批量生成视频"
+    },
+    {
+      "id": 4,
+      "type": "SceneAudioGeneratorNode",
+      "pos": [800, 500],
+      "size": [600, 350],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "properties": {
+        "Node name": "4_Audio_Generator"
+      },
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        "",
+        "male-qn-jingying",
+        true,
+        10
+      ],
+      "inputs": [
+        {
+          "name": "scenes_json",
+          "type": "STRING",
+          "link": 2,
+          "slot_index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio_json",
+          "type": "STRING",
+          "links": [7],
+          "slot_index": 0
+        },
+        {
+          "name": "summary",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "4. 批量生成音频"
+    },
+    {
+      "id": 5,
+      "type": "DramaManifestNode",
+      "pos": [1500, 500],
+      "size": [600, 400],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "properties": {
+        "Node name": "5_Manifest"
+      },
+      "widgets_values": [
+        "我的漫剧作品"
+      ],
+      "inputs": [
+        {
+          "name": "scenes_json",
+          "type": "STRING",
+          "link": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "images_json",
+          "type": "STRING",
+          "link": 5,
+          "slot_index": 1
+        },
+        {
+          "name": "videos_json",
+          "type": "STRING",
+          "link": 6,
+          "slot_index": 2
+        },
+        {
+          "name": "audio_json",
+          "type": "STRING",
+          "link": 7,
+          "slot_index": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "manifest_json",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "summary",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "title": "5. 整合资源清单"
+    },
+    {
+      "id": 6,
+      "type": "Note",
+      "pos": [100, 550],
+      "size": [600, 350],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "properties": {
+        "Node name": "Instructions"
+      },
+      "widgets_values": [
+        "【小说转漫剧工作流使用说明】\n\n1. 在所有节点填入相同的 API Key\n2. 在节点1输入中文小说文本\n3. 调整参数（场景数量、模型等）\n4. 点击 Queue Prompt 运行\n5. 等待处理完成（约 15-30 分钟）\n6. 在节点5查看最终 manifest.json\n\n配置建议：\n- 场景数量: 5-20 个\n- 文本模型: deepseek-chat（经济）\n- 图像模型: flux-pro（推荐）\n- 视频模型: kling-v2（推荐）\n- 音频音色: male-qn-jingying（男）\n\n成本估算：10 场景约 $4.40"
+      ],
+      "title": "使用说明"
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "STRING"],
+    [2, 1, 0, 4, 0, "STRING"],
+    [3, 1, 0, 5, 0, "STRING"],
+    [4, 2, 0, 3, 0, "STRING"],
+    [5, 2, 0, 5, 1, "STRING"],
+    [6, 3, 0, 5, 2, "STRING"],
+    [7, 4, 0, 5, 3, "STRING"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [0, 0]
+    }
+  },
+  "version": 0.4
+}

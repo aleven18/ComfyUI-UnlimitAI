@@ -1,0 +1,297 @@
+{
+  "last_node_id": 12,
+  "last_link_id": 16,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "DramaConfigNode",
+      "pos": [50, 100],
+      "size": [750, 550],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "properties": {
+        "Node name": "Config"
+      },
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        10,
+        "我的漫剧作品",
+        "deepseek-chat",
+        "english",
+        "cinematic",
+        "flux-pro",
+        "16:9",
+        "kling-v2",
+        "10",
+        "16:9",
+        "male-qn-jingying",
+        true
+      ],
+      "outputs": [
+        {"name": "api_key", "type": "STRING", "links": [1, 2, 3, 4], "slot_index": 0},
+        {"name": "config_json", "type": "STRING", "links": null, "slot_index": 1},
+        {"name": "text_config", "type": "STRING", "links": null, "slot_index": 2},
+        {"name": "image_config", "type": "STRING", "links": null, "slot_index": 3},
+        {"name": "video_config", "type": "STRING", "links": null, "slot_index": 4},
+        {"name": "audio_config", "type": "STRING", "links": null, "slot_index": 5},
+        {"name": "num_scenes_str", "type": "STRING", "links": [14], "slot_index": 6},
+        {"name": "drama_title", "type": "STRING", "links": [15], "slot_index": 7}
+      ],
+      "title": "⚖️ 性价比配置 ⭐推荐 - 设置参数"
+    },
+    {
+      "id": 2,
+      "type": "CostEstimatorNode",
+      "pos": [50, 700],
+      "size": [750, 350],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "properties": {
+        "Node name": "Cost"
+      },
+      "widgets_values": [
+        10,
+        "deepseek-chat",
+        "flux-pro",
+        "kling-v2",
+        "10",
+        true
+      ],
+      "outputs": [
+        {"name": "cost_breakdown", "type": "STRING", "links": null, "slot_index": 0},
+        {"name": "total_cost", "type": "FLOAT", "links": null, "slot_index": 1},
+        {"name": "recommendation", "type": "STRING", "links": null, "slot_index": 2}
+      ],
+      "title": "💰 成本估算 - 预计 $5.30/10场景"
+    },
+    {
+      "id": 3,
+      "type": "NovelToDramaWorkflowNode",
+      "pos": [900, 100],
+      "size": [650, 450],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "properties": {
+        "Node name": "Analyzer"
+      },
+      "widgets_values": [
+        "",
+        "在此输入小说文本...",
+        10,
+        "deepseek-chat",
+        "english",
+        "cinematic"
+      ],
+      "inputs": [
+        {"name": "api_key", "type": "STRING", "link": 1, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "scenes_json", "type": "STRING", "links": [5, 6, 7], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": [8], "slot_index": 1},
+        {"name": "total_cost", "type": "STRING", "links": null, "slot_index": 2}
+      ],
+      "title": "📝 小说分析 (DeepSeek V3)"
+    },
+    {
+      "id": 4,
+      "type": "SceneImageGeneratorNode",
+      "pos": [1650, 100],
+      "size": [650, 400],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "properties": {
+        "Node name": "ImageGen"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "flux-pro",
+        "16:9",
+        10
+      ],
+      "inputs": [
+        {"name": "scenes_json", "type": "STRING", "link": 5, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "images_json", "type": "STRING", "links": [9, 10], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": [11], "slot_index": 1}
+      ],
+      "title": "🖼️ 生成图像 (FLUX Pro - 高质量)"
+    },
+    {
+      "id": 5,
+      "type": "SceneVideoGeneratorNode",
+      "pos": [2400, 100],
+      "size": [650, 400],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "properties": {
+        "Node name": "VideoGen"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "kling-v2",
+        "10",
+        "16:9"
+      ],
+      "inputs": [
+        {"name": "images_json", "type": "STRING", "link": 9, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "videos_json", "type": "STRING", "links": [12], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": [13], "slot_index": 1}
+      ],
+      "title": "🎬 生成视频 (Kling v2 - 10秒，支持数字人)"
+    },
+    {
+      "id": 6,
+      "type": "SceneAudioGeneratorNode",
+      "pos": [1650, 550],
+      "size": [650, 400],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "properties": {
+        "Node name": "AudioGen"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "male-qn-jingying",
+        true,
+        10
+      ],
+      "inputs": [
+        {"name": "scenes_json", "type": "STRING", "link": 6, "slot_index": 0}
+      ],
+      "outputs": [
+        {"name": "audio_json", "type": "STRING", "links": [16], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": null, "slot_index": 1}
+      ],
+      "title": "🎤 生成音频 (Minimax TTS - 中文最佳)"
+    },
+    {
+      "id": 7,
+      "type": "DramaManifestNode",
+      "pos": [2400, 550],
+      "size": [650, 450],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "properties": {
+        "Node name": "Manifest"
+      },
+      "widgets_values": [
+        "我的漫剧作品"
+      ],
+      "inputs": [
+        {"name": "scenes_json", "type": "STRING", "link": 7, "slot_index": 0},
+        {"name": "images_json", "type": "STRING", "link": 10, "slot_index": 1},
+        {"name": "videos_json", "type": "STRING", "link": 12, "slot_index": 2},
+        {"name": "audio_json", "type": "STRING", "link": 16, "slot_index": 3}
+      ],
+      "outputs": [
+        {"name": "manifest_json", "type": "STRING", "links": null, "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": null, "slot_index": 1}
+      ],
+      "title": "✅ 整合输出"
+    },
+    {
+      "id": 8,
+      "type": "Note",
+      "pos": [900, 600],
+      "size": [650, 350],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "properties": {
+        "Node name": "Note"
+      },
+      "widgets_values": [
+        "【⚖️ 性价比配置特点】⭐推荐\n\n✅ 最佳性价比:\n  - 成本适中: $5.30/10场景\n  - 时间约23分钟\n  - 质量优秀\n\n✅ 模型选择:\n  文本: DeepSeek V3 (中文优秀)\n  图像: FLUX Pro (高质量)\n  视频: Kling v2 (10秒，数字人)\n  音频: Minimax TTS (中文最佳)\n  音乐: Suno Custom (可控风格)\n\n✅ 核心优势:\n  - 中文语音最佳 (Minimax)\n  - 支持数字人和对口型\n  - 10秒长视频\n  - 可控音乐风格"
+      ],
+      "title": "⚖️ 配置说明 ⭐推荐"
+    },
+    {
+      "id": 9,
+      "type": "Note",
+      "pos": [3150, 100],
+      "size": [500, 350],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "properties": {
+        "Node name": "Note"
+      },
+      "widgets_values": [
+        "【适用场景】\n\n✓ 日常使用\n✓ 个人项目\n✓ 成本敏感但追求质量\n✓ 中文内容制作\n✓ 短视频创作\n\n⭐ 推荐原因:\n  - 性价比最高\n  - 中文语音效果最好\n  - 支持数字人功能\n  - 适合大多数场景"
+      ],
+      "title": "🎯 适用场景 ⭐"
+    },
+    {
+      "id": 10,
+      "type": "Note",
+      "pos": [3150, 500],
+      "size": [500, 300],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "properties": {
+        "Node name": "Note"
+      },
+      "widgets_values": [
+        "【成本明细】\n\n10 场景性价比配置:\n  文本分析: $0.0003\n  图像生成: $0.30\n  视频生成: $3.00\n  音频合成: $1.00\n  背景音乐: $1.00\n  ━━━━━━━━━\n  总计: $5.30\n\n平衡成本和质量的最佳选择"
+      ],
+      "title": "💵 成本明细"
+    }
+  ],
+  "links": [
+    [1, 1, 0, 3, 0, "STRING"],
+    [2, 1, 0, 4, 0, "STRING"],
+    [3, 1, 0, 5, 0, "STRING"],
+    [4, 1, 0, 6, 0, "STRING"],
+    [5, 3, 0, 4, 0, "STRING"],
+    [6, 3, 0, 6, 0, "STRING"],
+    [7, 3, 0, 7, 0, "STRING"],
+    [8, 3, 1, 8, 0, "STRING"],
+    [9, 4, 0, 5, 0, "STRING"],
+    [10, 4, 0, 7, 1, "STRING"],
+    [11, 4, 1, 9, 0, "STRING"],
+    [12, 5, 0, 7, 2, "STRING"],
+    [13, 5, 1, 10, 0, "STRING"],
+    [14, 1, 6, 2, 0, "STRING"],
+    [15, 1, 7, 7, 0, "STRING"],
+    [16, 6, 0, 7, 3, "STRING"]
+  ],
+  "groups": [
+    {
+      "title": "⚖️ 性价比配置 ⭐推荐",
+      "bounding": [40, 80, 770, 990],
+      "color": "#8f8"
+    },
+    {
+      "title": "处理区",
+      "bounding": [890, 80, 2170, 930],
+      "color": "#88f"
+    },
+    {
+      "title": "说明区",
+      "bounding": [3140, 80, 520, 760],
+      "color": "#f88"
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.75,
+      "offset": [0, 0]
+    }
+  },
+  "version": 0.4
+}

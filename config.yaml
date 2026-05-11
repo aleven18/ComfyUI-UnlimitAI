@@ -1,0 +1,275 @@
+# =============================================================================
+# ComfyUI-UnlimitAI 配置文件
+# =============================================================================
+
+# API配置
+api:
+  # UnlimitAI API配置
+  unlimitai:
+    base_url: "https://api.unlimitai.com"
+    timeout: 60
+    max_retries: 3
+    
+  # 请求配置
+  request:
+    interval: 0.5  # 请求间隔（秒）
+    max_parallel: 5  # 最大并行请求数
+
+# 日志配置
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "logs/unlimitai.log"
+  colors: true
+  format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+
+# 默认模型配置
+models:
+  text:
+    default: "deepseek-chat"
+    options:
+      - "deepseek-chat"
+      - "deepseek-reasoner"
+      - "gpt-4"
+      - "gpt-4-turbo"
+      - "claude-3-opus"
+      - "claude-3-sonnet"
+      
+  image:
+    default: "flux.1-schnell"
+    options:
+      - "flux.1-schnell"
+      - "flux.1-dev"
+      - "imagen-3.0-generate-002"
+      - "ideogram-v2"
+      
+  video:
+    default: "kling-video-v2"
+    options:
+      - "kling-video-v2"
+      - "runway-gen3-turbo"
+      - "pika-2.0"
+      - "veo-002"
+      
+  audio:
+    default: "tts-1"
+    options:
+      - "tts-1"
+      - "tts-1-hd"
+      - "minimax-tts"
+      
+  music:
+    default: "musicgen"
+    options:
+      - "musicgen"
+      - "stable-audio-2.0"
+
+# 生成参数配置
+generation:
+  image:
+    default_size: "1024x1024"
+    sizes:
+      - "512x512"
+      - "768x768"
+      - "1024x1024"
+      - "1024x1792"
+      - "1792x1024"
+    default_steps: 4
+    default_guidance: 3.5
+    
+  video:
+    default_duration: 5.0
+    durations:
+      - 5.0
+      - 10.0
+    default_resolution: "1080p"
+    resolutions:
+      - "720p"
+      - "1080p"
+      
+  audio:
+    default_sample_rate: 22050
+    default_speed: 1.0
+    
+  music:
+    default_duration: 30.0
+    max_duration: 180.0
+
+# 工作流配置
+workflows:
+  budget:
+    name: "成本优化"
+    description: "最低成本，快速生成"
+    quality: "low"
+    cost: "low"
+    models:
+      text: "deepseek-chat"
+      image: "flux.1-schnell"
+      video: "kling-video-v2"
+      audio: "tts-1"
+      music: "musicgen"
+      
+  balanced:
+    name: "平衡模式"
+    description: "平衡质量和成本"
+    quality: "medium"
+    cost: "medium"
+    models:
+      text: "deepseek-chat"
+      image: "flux.1-dev"
+      video: "kling-video-v2"
+      audio: "minimax-tts"
+      music: "musicgen"
+      
+  quality:
+    name: "质量优先"
+    description: "高质量生成，成本较高"
+    quality: "high"
+    cost: "high"
+    models:
+      text: "gpt-4-turbo"
+      image: "ideogram-v2"
+      video: "runway-gen3-turbo"
+      audio: "minimax-tts"
+      music: "stable-audio-2.0"
+      
+  max_quality:
+    name: "极致质量"
+    description: "最高质量，成本最高"
+    quality: "very_high"
+    cost: "very_high"
+    models:
+      text: "claude-3-opus"
+      image: "ideogram-v2"
+      video: "runway-gen3-turbo"
+      audio: "minimax-tts"
+      music: "stable-audio-2.0"
+
+# 存储配置
+storage:
+  data_dir: "data"
+  character_db: "data/characters.json"
+  scene_db: "data/scenes.json"
+  project_db: "data/projects.json"
+  cache_ttl: 3600  # 缓存TTL（秒）
+
+# ComfyUI配置
+comfyui:
+  input_dir: "input"
+  output_dir: "output"
+  temp_dir: "temp"
+  
+# 成本配置
+costs:
+  # 文本模型成本（每1K tokens）
+  text:
+    deepseek-chat:
+      input: 0.0001
+      output: 0.0002
+    deepseek-reasoner:
+      input: 0.00055
+      output: 0.00219
+    gpt-4:
+      input: 0.03
+      output: 0.06
+    claude-3-opus:
+      input: 0.015
+      output: 0.075
+      
+  # 图像模型成本（每次生成）
+  image:
+    flux.1-schnell: 0.003
+    flux.1-dev: 0.01
+    imagen-3.0-generate-002: 0.04
+    ideogram-v2: 0.05
+    
+  # 视频模型成本（每秒）
+  video:
+    kling-video-v2: 0.02
+    runway-gen3-turbo: 0.05
+    pika-2.0: 0.016
+    
+  # 音频模型成本（每字符）
+  audio:
+    tts-1: 0.000015
+    tts-1-hd: 0.00003
+    minimax-tts: 0.00002
+    
+  # 音乐模型成本（每秒）
+  music:
+    musicgen: 0.001
+    stable-audio-2.0: 0.002
+
+# 性能配置
+performance:
+  cache_enabled: true
+  async_enabled: true
+  profiling_enabled: false
+  
+# 工作流优化配置
+optimization:
+  # 智能跳过配置
+  smart_skip:
+    enabled: true
+    skip_rules:
+      image:
+        min_prompt_length: 10
+        skip_similar: true
+        similarity_threshold: 0.85
+      video:
+        skip_if_no_image: true
+        skip_similar: true
+      audio:
+        skip_empty_text: true
+      music:
+        skip_similar_mood: true
+    cache_ttl: 3600
+  
+  # 内容去重配置
+  deduplication:
+    enabled: true
+    storage_path: "data/dedup_cache.json"
+    max_cache_size: 10000
+    hash_algorithm: "sha256"
+    ttl_days: 30
+  
+  # 进度跟踪配置
+  progress_tracking:
+    enabled: true
+    update_interval: 1.0
+    time_estimation: true
+    show_eta: true
+  
+  # 智能延迟配置
+  smart_delay:
+    enabled: true
+    base_delay: 1.0
+    min_delay: 0.5
+    max_delay: 30.0
+    adaptive: true
+    rate_limit_detection: true
+  
+  # 速率限制配置
+  rate_limit:
+    requests_per_minute: 60
+    max_burst: 10
+    backoff_multiplier: 2.0
+  
+  # 健壮执行器配置
+  executor:
+    max_retries: 3
+    timeout: 300.0
+    enable_progress: true
+    error_isolation: true
+  
+  # 预计节省率
+  expected_savings:
+    smart_skip: "20-40%"
+    deduplication: "10-20%"
+    total: "30-60%"
+   
+# 开发配置
+development:
+  debug: false
+  dev_mode: false
+  mock_api: false

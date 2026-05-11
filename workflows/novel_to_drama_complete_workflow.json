@@ -1,0 +1,324 @@
+{
+  "last_node_id": 15,
+  "last_link_id": 20,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Note",
+      "pos": [50, 50],
+      "size": [450, 280],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "properties": {
+        "text": "【小说转漫剧完整工作流】\n\n功能：将中文小说自动转换为英文漫剧视频\n\n步骤：\n1. 输入中文小说文本\n2. AI 分析提取场景、对话、视觉提示词\n3. 翻译为英文（可选）\n4. 批量生成场景图像\n5. 批量生成场景视频\n6. 批量生成对话配音 + 背景音乐\n7. 整合所有资源清单\n\n输出：\n- manifest.json（完整资源清单）\n- 包含所有图像、视频、音频的 URL\n\n预计成本：10 场景约 $4.40"
+      },
+      "widgets_values": ["小说转漫剧工作流说明"],
+      "color": "#226",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 2,
+      "type": "NovelToDramaWorkflowNode",
+      "pos": [550, 50],
+      "size": [500, 350],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "properties": {"Node name": "1. 小说分析"},
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        "第一章 相遇\n\n春日的阳光透过梧桐树叶洒落在街道上，林晓薇匆匆走在去公司的路上。她没注意到，一辆黑色轿车正缓缓驶来...\n\n\"小心！\"\n\n一个低沉的男声响起，林晓薇被拉入一个温暖的怀抱。她抬头，看到一双深邃的眼眸。\n\n\"你没事吧？\"男人关切地问道，声音中带着一丝紧张。\n\n林晓薇愣住了，这个男人有着俊朗的面容，眉宇间透着一股英气。她似乎在哪里见过他...\n\n\"我...我没事。\"她有些慌乱地站直身子，\"谢谢你。\"\n\n男人微微一笑：\"我叫陆晨轩。很高兴认识你，虽然是在这种情况下。\"\n\n林晓薇感觉心跳加速了一拍：\"我叫林晓薇。\"\n\n这一刻，命运的齿轮开始转动...",
+        10,
+        "deepseek-chat",
+        "english",
+        "cinematic"
+      ],
+      "outputs": [
+        {"name": "scenes_json", "type": "STRING", "links": [1, 2, 3, 4], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": [5], "slot_index": 1},
+        {"name": "total_cost", "type": "STRING", "links": [6], "slot_index": 2}
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 3,
+      "type": "Note",
+      "pos": [550, 430],
+      "size": [300, 80],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "properties": {
+        "text": "输出:\n- scenes_json: 场景数据\n- summary: 剧情概要\n- total_cost: 预估成本"
+      },
+      "widgets_values": ["输出说明"],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 4,
+      "type": "SceneImageGeneratorNode",
+      "pos": [1100, 50],
+      "size": [500, 280],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "properties": {"Node name": "2. 批量生成图像"},
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        "",
+        "flux-pro",
+        "16:9",
+        10
+      ],
+      "inputs": [
+        {"name": "scenes_json", "type": "STRING", "link": 1, "slot": 0}
+      ],
+      "outputs": [
+        {"name": "images_json", "type": "STRING", "links": [7, 10], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": [8], "slot_index": 1}
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 5,
+      "type": "Note",
+      "pos": [1100, 360],
+      "size": [300, 60],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "properties": {
+        "text": "为每个场景生成高质量图像\n模型: FLUX Pro (推荐)"
+      },
+      "widgets_values": ["图像生成说明"],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 6,
+      "type": "SceneVideoGeneratorNode",
+      "pos": [1650, 50],
+      "size": [500, 280],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "properties": {"Node name": "3. 批量生成视频"},
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        "",
+        "kling-v2",
+        "5",
+        "16:9"
+      ],
+      "inputs": [
+        {"name": "images_json", "type": "STRING", "link": 7, "slot": 0}
+      ],
+      "outputs": [
+        {"name": "videos_json", "type": "STRING", "links": [11], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": [9], "slot_index": 1}
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 7,
+      "type": "Note",
+      "pos": [1650, 360],
+      "size": [300, 60],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "properties": {
+        "text": "将静态图像动画化为视频\n模型: Kling v2 (推荐)"
+      },
+      "widgets_values": ["视频生成说明"],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 8,
+      "type": "SceneAudioGeneratorNode",
+      "pos": [1100, 470],
+      "size": [500, 280],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "properties": {"Node name": "4. 批量生成音频"},
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        "",
+        "male-qn-jingying",
+        true,
+        10
+      ],
+      "inputs": [
+        {"name": "scenes_json", "type": "STRING", "link": 2, "slot": 0}
+      ],
+      "outputs": [
+        {"name": "audio_json", "type": "STRING", "links": [12], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": [13], "slot_index": 1}
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 9,
+      "type": "Note",
+      "pos": [1100, 780],
+      "size": [350, 80],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "properties": {
+        "text": "生成:\n1. 对话配音（Minimax TTS 中文最佳）\n2. 背景音乐（Suno 根据场景情绪自动生成）"
+      },
+      "widgets_values": ["音频生成说明"],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 10,
+      "type": "DramaManifestNode",
+      "pos": [1650, 470],
+      "size": [500, 300],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "properties": {"Node name": "5. 整合资源清单"},
+      "widgets_values": ["我的漫剧作品"],
+      "inputs": [
+        {"name": "scenes_json", "type": "STRING", "link": 3, "slot": 0},
+        {"name": "images_json", "type": "STRING", "link": 10, "slot": 1},
+        {"name": "videos_json", "type": "STRING", "link": 11, "slot": 2},
+        {"name": "audio_json", "type": "STRING", "link": 12, "slot": 3}
+      ],
+      "outputs": [
+        {"name": "manifest_json", "type": "STRING", "links": [14], "slot_index": 0},
+        {"name": "summary", "type": "STRING", "links": [15], "slot_index": 1}
+      ],
+      "color": "#326",
+      "bgcolor": "#537"
+    },
+    {
+      "id": 11,
+      "type": "Note",
+      "pos": [1650, 810],
+      "size": [400, 80],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "properties": {
+        "text": "最终输出 manifest.json:\n- 所有场景数据\n- 图像/视频/音频 URL\n- 完整资源清单"
+      },
+      "widgets_values": ["最终输出说明"],
+      "color": "#326",
+      "bgcolor": "#537"
+    },
+    {
+      "id": 12,
+      "type": "Reroute",
+      "pos": [530, 180],
+      "size": [75, 26],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [{"name": "", "type": "STRING", "link": 4}],
+      "outputs": [{"name": "", "type": "STRING", "links": [16]}],
+      "properties": {"showOutputText": true, "horizontal": false}
+    },
+    {
+      "id": 13,
+      "type": "Note",
+      "pos": [50, 380],
+      "size": [450, 300],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "properties": {
+        "text": "【使用说明】\n\n1. 准备工作:\n   - 获取 UnlimitAI API Key\n   - 在所有节点填入相同的 API Key\n\n2. 配置参数:\n   - 小说文本: 粘贴您的小说内容\n   - 场景数量: 建议设置为 5-20 个\n   - 文本模型: deepseek-chat (经济) 或 gpt-4o (高质量)\n   - 图像模型: flux-pro (推荐)\n   - 视频模型: kling-v2 (推荐)\n   - 音频音色: male-qn-jingying (男) 或 female-shaonv (女)\n\n3. 运行工作流:\n   - 点击 Queue Prompt 执行\n   - 等待处理完成（约 10-30 分钟）\n\n4. 获取结果:\n   - 最后一个节点输出 manifest.json\n   - 包含所有资源的下载链接"
+      },
+      "widgets_values": ["使用说明"],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 14,
+      "type": "Note",
+      "pos": [50, 720],
+      "size": [450, 200],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "properties": {
+        "text": "【成本优化建议】\n\n经济配置（~$2.00/10场景）:\n- 文本: deepseek-chat\n- 图像: flux-pro\n- 视频: vidu2\n- 音频: minimax-tts\n\n高质量配置（~$6.00/10场景）:\n- 文本: gpt-4o\n- 图像: ideogram-v3\n- 视频: kling-v2\n- 音频: minimax-tts + suno v5\n\n批量生成可节省约 30% 成本"
+      },
+      "widgets_values": ["成本优化"],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 15,
+      "type": "Note",
+      "pos": [2200, 50],
+      "size": [400, 600],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "properties": {
+        "text": "【输出数据格式示例】\n\nmanifest.json 结构:\n\n{\n  \"title\": \"我的漫剧作品\",\n  \"created_at\": \"2026-05-02\",\n  \"total_scenes\": 10,\n  \"scenes\": [\n    {\n      \"scene_number\": 1,\n      \"title\": \"春日相遇\",\n      \"description\": \"林晓薇在街上差点被车撞...\",\n      \"characters\": [\"林晓薇\", \"陆晨轩\"],\n      \"mood\": \"romantic\",\n      \"dialogue\": \"(breath) 小心！你没事吧？\",\n      \"visual_prompt\": \"Cinematic shot of a young woman...\",\n      \"camera_movement\": \"slow zoom in\",\n      \"image_url\": \"https://...\",\n      \"video_url\": \"https://...\",\n      \"dialogue_url\": \"https://...\",\n      \"music_url\": \"https://...\"\n    },\n    ...\n  ]\n}\n\n每个场景包含:\n✓ 场景描述和对话\n✓ 人物列表\n✓ 情绪标签\n✓ 视觉提示词\n✓ 图像 URL\n✓ 视频 URL\n✓ 配音 URL\n✓ 音乐 URL"
+      },
+      "widgets_values": ["输出格式"],
+      "color": "#326",
+      "bgcolor": "#537"
+    }
+  ],
+  "links": [
+    [1, 2, 0, 4, 0, "STRING"],
+    [2, 2, 0, 8, 0, "STRING"],
+    [3, 2, 0, 10, 0, "STRING"],
+    [4, 2, 0, 12, 0, "STRING"],
+    [7, 4, 0, 6, 0, "STRING"],
+    [10, 4, 0, 10, 1, "STRING"],
+    [11, 6, 0, 10, 2, "STRING"],
+    [12, 8, 0, 10, 3, "STRING"]
+  ],
+  "groups": [
+    {
+      "title": "输入与配置",
+      "bounding": [40, 30, 990, 470],
+      "color": "#8f8"
+    },
+    {
+      "title": "图像生成",
+      "bounding": [1090, 30, 510, 410],
+      "color": "#8f8"
+    },
+    {
+      "title": "视频生成",
+      "bounding": [1640, 30, 510, 410],
+      "color": "#8f8"
+    },
+    {
+      "title": "音频生成",
+      "bounding": [1090, 450, 510, 420],
+      "color": "#8f8"
+    },
+    {
+      "title": "最终输出",
+      "bounding": [1640, 450, 510, 460],
+      "color": "#88f"
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.8,
+      "offset": [0, 0]
+    }
+  },
+  "version": 0.4
+}

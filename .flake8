@@ -1,0 +1,58 @@
+[flake8]
+max-line-length = 100
+max-complexity = 10
+extend-ignore = 
+    E203,  # Whitespace before ':' (conflicts with black)
+    W503,  # Line break before binary operator (conflicts with black)
+    E501,  # Line too long (handled by black)
+    D100,  # Missing docstring in public module
+    D101,  # Missing docstring in public class
+    D102,  # Missing docstring in public method
+    D103,  # Missing docstring in public function
+    D104,  # Missing docstring in public package
+    D105,  # Missing docstring in magic method
+    D107,  # Missing docstring in __init__
+    D203,  # 1 blank line required before class docstring
+    D213,  # Multi-line docstring summary should start at the second line
+
+exclude =
+    .git,
+    __pycache__,
+    __pycache__,
+    .tox,
+    .eggs,
+    *.egg,
+    build,
+    dist,
+    venv,
+    .venv,
+    env,
+    ENV,
+    node_modules,
+    .pytest_cache,
+    .mypy_cache,
+    *.pyc,
+    *.pyo,
+    .env
+
+per-file-ignores =
+    __init__.py:F401
+    tests/*:D,S101
+    nodes/*:D
+    utils/*:D
+
+# Docstring style
+docstring-convention = google
+
+# Import style
+import-order-style = google
+application-import-names = nodes,utils,tests
+
+# Complexity checks
+max-cognitive-complexity = 15
+
+# Security checks (via bandit integration)
+select = C,E,F,W,B,B950
+
+# Additional plugins
+# Install with: pip install flake8-bugbear flake8-comprehensions flake8-docstrings

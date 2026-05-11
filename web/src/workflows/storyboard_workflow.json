@@ -1,0 +1,35 @@
+{
+  "last_node_id": 2,
+  "last_link_id": 0,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "StoryboardVideoV3Node",
+      "pos": [300, 200],
+      "size": [700, 500],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "properties": {
+        "Node name": "Storyboard Video"
+      },
+      "widgets_values": [
+        "",
+        "[]",
+        "kling-v2-master",
+        "5",
+        "16:9",
+        0.5,
+        "std",
+        "",
+        ""
+      ],
+      "outputs": [
+        {"name": "video", "type": "VIDEO", "links": null, "slot_index": 0},
+        {"name": "task_id", "type": "STRING", "links": null, "slot_index": 1}
+      ],
+      "title": "🎬 故事板视频生成"
+    }
+  ],
+  "links": []
+}

@@ -1,0 +1,70 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text eol=lf
+*.pyi text eol=lf
+
+# Jupyter Notebooks
+*.ipynb text eol=lf
+
+# JSON files
+*.json text eol=lf
+*.jsonl text eol=lf
+
+# YAML files
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Markdown files
+*.md text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Config files
+*.cfg text eol=lf
+*.ini text eol=lf
+*.toml text eol=lf
+.env* text eol=lf
+
+# Docker files
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+.dockerignore text eol=lf
+
+# Git files
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Documentation
+LICENSE text eol=lf
+AUTHORS text eol=lf
+CONTRIBUTING text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.wav binary
+*.zip binary
+*.gz binary
+*.pyc binary
+*.pyd binary
+*.so binary
+*.dll binary
+*.dylib binary
+
+# Exclude from GitHub language stats
+*.min.js linguist-generated
+*.min.css linguist-generated
+package-lock.json linguist-generated
+yarn.lock linguist-generated
+poetry.lock linguist-generated

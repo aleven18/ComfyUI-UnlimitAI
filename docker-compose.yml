@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # Main ComfyUI service with UnlimitAI plugin
+  comfyui-unlimitai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: comfyui-unlimitai:latest
+    container_name: comfyui-unlimitai
+    
+    ports:
+      - "8188:8188"
+    
+    volumes:
+      # Persist data
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./logs:/app/logs
+      
+      # ComfyUI models (if needed)
+      - comfyui-models:/app/models
+      
+    environment:
+      # API Configuration
+      - UNITED_API_KEY=${UNITED_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # Performance
+      - MAX_WORKERS=${MAX_WORKERS:-4}
+      - CACHE_TTL=${CACHE_TTL:-3600}
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8188/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - comfyui-network
+    
+    deploy:
+      resources:
+        reservations:
+          cpus: '2'
+          memory: 4G
+        limits:
+          cpus: '4'
+          memory: 8G
+
+  # Optional: Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: comfyui-redis
+    
+    ports:
+      - "6379:6379"
+    
+    volumes:
+      - redis-data:/data
+    
+    command: redis-server --appendonly yes
+    
+    restart: unless-stopped
+    
+    networks:
+      - comfyui-network
+    
+    deploy:
+      resources:
+        reservations:
+          memory: 512M
+        limits:
+          memory: 1G
+
+  # Optional: PostgreSQL for persistent storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: comfyui-postgres
+    
+    environment:
+      - POSTGRES_USER=comfyui
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-comfyui}
+      - POSTGRES_DB=comfyui_unlimitai
+    
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    
+    ports:
+      - "5432:5432"
+    
+    restart: unless-stopped
+    
+    networks:
+      - comfyui-network
+    
+    deploy:
+      resources:
+        reservations:
+          memory: 512M
+        limits:
+          memory: 2G
+
+networks:
+  comfyui-network:
+    driver: bridge
+
+volumes:
+  comfyui-models:
+  redis-data:
+  postgres-data:

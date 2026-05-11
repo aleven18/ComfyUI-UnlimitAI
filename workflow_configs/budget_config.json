@@ -1,0 +1,109 @@
+{
+  "name": "BUDGET",
+  "display_name": "💰 最经济配置",
+  "description": "最低成本，可接受质量，适合测试和预览",
+  "quality_level": 3,
+  "estimated_cost": 2.03,
+  "estimated_time": "12 minutes",
+  
+  "models": {
+    "text": {
+      "model": "deepseek-chat",
+      "endpoint": "/v1/chat/completions",
+      "quality": 4,
+      "cost": 0.0003,
+      "params": {
+        "temperature": 0.7,
+        "max_tokens": 4000
+      }
+    },
+    
+    "image": {
+      "model": "flux-schnell",
+      "endpoint": "/api/v1/flux/generate",
+      "quality": 3,
+      "cost_per_image": 0.003,
+      "params": {
+        "aspect_ratio": "16:9",
+        "num_images": 1
+      },
+      "features": {
+        "synchronous": true,
+        "speed": "fastest"
+      }
+    },
+    
+    "video": {
+      "model": "vidu2",
+      "endpoint": "/v1/videos/vidu/image-to-video",
+      "quality": 3,
+      "cost_per_video": 0.15,
+      "params": {
+        "duration": "4s",
+        "aspect_ratio": "16:9"
+      },
+      "features": {
+        "image_to_video": true,
+        "speed": "fast"
+      }
+    },
+    
+    "audio": {
+      "model": "tts-1",
+      "endpoint": "/v1/audio/speech",
+      "quality": 4,
+      "cost_per_char": 0.000003,
+      "params": {
+        "voice": "onyx",
+        "response_format": "mp3"
+      }
+    },
+    
+    "music": {
+      "model": "suno-inspiration",
+      "endpoint": "/api/v1/suno/inspiration",
+      "quality": 3,
+      "cost_per_track": 0.05,
+      "params": {
+        "make_instrumental": true
+      }
+    }
+  },
+  
+  "cost_breakdown": {
+    "text_analysis": 0.0003,
+    "image_generation": 0.03,
+    "video_generation": 1.50,
+    "audio_synthesis": 0.003,
+    "background_music": 0.50,
+    "total": 2.03
+  },
+  
+  "quality_scores": {
+    "text_understanding": 4,
+    "image_quality": 3,
+    "video_quality": 3,
+    "audio_quality": 4,
+    "music_quality": 3,
+    "consistency": 4,
+    "overall": 3
+  },
+  
+  "use_cases": [
+    "测试工作流",
+    "快速预览效果",
+    "预算严格限制"
+  ],
+  
+  "pros": [
+    "成本最低",
+    "速度最快",
+    "适合测试"
+  ],
+  
+  "cons": [
+    "视频时长短 (4秒)",
+    "图像质量一般",
+    "音乐风格随机"
+  ]
+}

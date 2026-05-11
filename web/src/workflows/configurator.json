@@ -1,0 +1,155 @@
+{
+  "last_node_id": 10,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "DramaConfigNode",
+      "pos": [50, 100],
+      "size": [700, 500],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "properties": {
+        "Node name": "Config"
+      },
+      "widgets_values": [
+        "YOUR_API_KEY_HERE",
+        10,
+        "我的漫剧作品",
+        "deepseek-chat",
+        "english",
+        "cinematic",
+        "flux-pro",
+        "16:9",
+        "kling-v2",
+        "5",
+        "16:9",
+        "male-qn-jingying",
+        true
+      ],
+      "outputs": [
+        {"name": "api_key", "type": "STRING", "links": [1, 2, 3, 4], "slot_index": 0},
+        {"name": "config_json", "type": "STRING", "links": null, "slot_index": 1},
+        {"name": "text_config", "type": "STRING", "links": null, "slot_index": 2},
+        {"name": "image_config", "type": "STRING", "links": null, "slot_index": 3},
+        {"name": "video_config", "type": "STRING", "links": null, "slot_index": 4},
+        {"name": "audio_config", "type": "STRING", "links": null, "slot_index": 5},
+        {"name": "num_scenes_str", "type": "STRING", "links": null, "slot_index": 6},
+        {"name": "drama_title", "type": "STRING", "links": [5], "slot_index": 7}
+      ],
+      "title": "🎨 配置中心（选择模型）"
+    },
+    {
+      "id": 2,
+      "type": "CostEstimatorNode",
+      "pos": [50, 650],
+      "size": [700, 300],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "properties": {
+        "Node name": "Cost"
+      },
+      "widgets_values": [
+        10,
+        "deepseek-chat",
+        "flux-pro",
+        "kling-v2",
+        "5",
+        true
+      ],
+      "outputs": [
+        {"name": "cost_breakdown", "type": "STRING", "links": null, "slot_index": 0},
+        {"name": "total_cost", "type": "FLOAT", "links": null, "slot_index": 1},
+        {"name": "recommendation", "type": "STRING", "links": null, "slot_index": 2}
+      ],
+      "title": "💰 成本估算（运行前查看）"
+    },
+    {
+      "id": 3,
+      "type": "Note",
+      "pos": [800, 100],
+      "size": [500, 400],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "properties": {
+        "Node name": "Note"
+      },
+      "widgets_values": [
+        "【工作流说明】\n\n此工作流支持自定义选择模型：\n\n步骤 1: 配置中心\n  → 选择文本/图像/视频/音频模型\n  → 设置场景数量、音色等\n\n步骤 2: 查看成本估算\n  → 了解预估费用\n  → 调整配置控制成本\n\n步骤 3: 运行主工作流\n  → 加载 novel_to_drama_complete.json\n  → 使用配置中心的 API Key\n\n推荐配置：\n\n经济 ($3.80/10场景):\n  video_model: vidu2\n\n标准 ($4.40/10场景): ⭐推荐\n  video_model: kling-v2\n\n高质量 ($6.60/10场景):\n  video_model: veo-3.1\n  image_model: ideogram-v3"
+      ],
+      "title": "📖 使用说明"
+    },
+    {
+      "id": 4,
+      "type": "Note",
+      "pos": [800, 550],
+      "size": [500, 350],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "properties": {
+        "Node name": "Note"
+      },
+      "widgets_values": [
+        "【视频模型选择指南】\n\nKling v2 (推荐) ⭐⭐⭐⭐\n  成本: $0.30/视频\n  优点: 功能全、中文优化\n  适用: 漫剧、短视频、个人项目\n\nVEO 3.1 (最高质量) ⭐⭐⭐⭐⭐\n  成本: $0.50/视频\n  优点: 4K输出、自带音频\n  适用: 商业项目、专业制作\n\nVIDU v2 (经济) ⭐⭐⭐\n  成本: $0.25/视频\n  优点: 速度快、成本低\n  适用: 快速预览、测试\n\nHailuo-2.3 (创意) ⭐⭐⭐⭐\n  成本: $0.35/视频\n  优点: 导演模式\n  适用: 创意视频\n\nLuma (风格化) ⭐⭐⭐\n  成本: $0.30/视频\n  优点: 风格化强\n  适用: 艺术视频"
+      ],
+      "title": "🎬 视频模型选择"
+    },
+    {
+      "id": 5,
+      "type": "Note",
+      "pos": [1350, 100],
+      "size": [500, 400],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "properties": {
+        "Node name": "Note"
+      },
+      "widgets_values": [
+        "【图像模型选择指南】\n\nFLUX Pro (推荐) ⭐⭐⭐⭐⭐\n  成本: $0.03/张\n  优点: 质量高、速度快\n  适用: 通用场景\n\nIdeogram V3 (文字) ⭐⭐⭐⭐⭐\n  成本: $0.05/张\n  优点: 文字渲染优秀\n  适用: 含文字场景\n\nKling v2 (中文) ⭐⭐⭐⭐\n  成本: $0.02/张\n  优点: 中文场景优化\n  适用: 中国风格\n\nDALL-E 3 (创意) ⭐⭐⭐⭐\n  成本: $0.08/张\n  优点: OpenAI 生态\n  适用: 创意场景\n\nImagen 4 (写实) ⭐⭐⭐⭐⭐\n  成本: $0.04/张\n  优点: 写实效果好\n  适用: 真实场景"
+      ],
+      "title": "🖼️ 图像模型选择"
+    },
+    {
+      "id": 6,
+      "type": "Note",
+      "pos": [1350, 550],
+      "size": [500, 350],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "properties": {
+        "Node name": "Note"
+      },
+      "widgets_values": [
+        "【文本模型选择指南】\n\nDeepSeek Chat (推荐) ⭐⭐⭐⭐\n  成本: $0.00014/1K tokens\n  优点: 极低成本\n  适用: 大批量处理\n\nGPT-4o (高质量) ⭐⭐⭐⭐⭐\n  成本: $0.0025/1K tokens\n  优点: 质量高、稳定\n  适用: 重要项目\n\nClaude 3.5 Sonnet (文学) ⭐⭐⭐⭐⭐\n  成本: $0.003/1K tokens\n  优点: 文学创作优秀\n  适用: 小说改编\n\nGPT-5 (推理) ⭐⭐⭐⭐⭐\n  成本: $0.03/1K tokens\n  优点: 复杂推理\n  适用: 深度分析\n\nDeepSeek Reasoner (思考) ⭐⭐⭐⭐⭐\n  成本: $0.00055/1K tokens\n  优点: 显示思考过程\n  适用: 场景分析"
+      ],
+      "title": "📝 文本模型选择"
+    }
+  ],
+  "links": [],
+  "groups": [
+    {
+      "title": "配置与估算",
+      "bounding": [40, 80, 720, 890],
+      "color": "#8f8"
+    },
+    {
+      "title": "模型选择指南",
+      "bounding": [790, 80, 1080, 850],
+      "color": "#88f"
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [0, 0]
+    }
+  },
+  "version": 0.4
+}

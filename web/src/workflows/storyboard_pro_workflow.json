@@ -1,0 +1,44 @@
+{
+  "last_node_id": 1,
+  "last_link_id": 0,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "StoryboardProV3Node",
+      "pos": [300, 200],
+      "size": [700, 600],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "properties": {
+        "Node name": "Storyboard Pro"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "",
+        "subject",
+        0.5,
+        0.45,
+        "gpt-4o",
+        "kling-v2",
+        "kling-v2-master",
+        4,
+        "5",
+        "16:9",
+        0.5,
+        "std",
+        "",
+        "off"
+      ],
+      "outputs": [
+        {"name": "video", "type": "VIDEO", "links": null, "slot_index": 0},
+        {"name": "master_prompt", "type": "STRING", "links": null, "slot_index": 1},
+        {"name": "video_prompts", "type": "STRING", "links": null, "slot_index": 2},
+        {"name": "storyboard_image_url", "type": "STRING", "links": null, "slot_index": 3}
+      ],
+      "title": "🎬 故事板视频 Pro"
+    }
+  ],
+  "links": []
+}

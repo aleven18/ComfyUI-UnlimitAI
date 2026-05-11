@@ -1,0 +1,169 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfyui-unlimitai"
+version = "1.0.0"
+description = "ComfyUI custom nodes for AI-powered novel to comic drama conversion using UnlimitAI API"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "ComfyUI-UnlimitAI Team", email = "team@example.com"}
+]
+maintainers = [
+    {name = "ComfyUI-UnlimitAI Team", email = "team@example.com"}
+]
+keywords = [
+    "comfyui",
+    "ai",
+    "novel",
+    "comic",
+    "video-generation",
+    "image-generation",
+    "audio-generation",
+    "unlimitai",
+    "deepseek",
+    "kling"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Artistic Software",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "requests>=2.31.0",
+    "Pillow>=9.0.0",
+    "numpy>=1.21.0",
+    "aiohttp>=3.8.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+]
+all = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "torchaudio>=2.0.0",
+    "transformers>=4.30.0",
+    "accelerate>=0.20.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/ComfyUI-UnlimitAI"
+Documentation = "https://github.com/yourusername/ComfyUI-UnlimitAI#readme"
+Repository = "https://github.com/yourusername/ComfyUI-UnlimitAI.git"
+Issues = "https://github.com/yourusername/ComfyUI-UnlimitAI/issues"
+Changelog = "https://github.com/yourusername/ComfyUI-UnlimitAI/blob/main/CHANGELOG.md"
+
+[project.scripts]
+comfyui-unlimitai = "cli:main"
+
+[tool.setuptools]
+packages = ["nodes", "utils", "workflows"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.yaml", "*.yml"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # defaults
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  # custom
+  | __pycache__
+  | \.pytest_cache
+  | node_modules
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_optional = true
+
+[[tool.mypy.overrides]]
+module = [
+    "PIL.*",
+    "numpy.*",
+    "torch.*",
+    "transformers.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=nodes --cov=utils --cov-report=term-missing --cov-report=html --cov-fail-under=45"
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["nodes", "utils"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

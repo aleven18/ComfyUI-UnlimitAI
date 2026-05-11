@@ -1,0 +1,118 @@
+{
+  "name": "BALANCED",
+  "display_name": "⚖️ 性价比配置",
+  "description": "平衡成本和质量，适合日常使用和个人项目",
+  "quality_level": 4,
+  "estimated_cost": 5.30,
+  "estimated_time": "23 minutes",
+  
+  "models": {
+    "text": {
+      "model": "deepseek-chat",
+      "endpoint": "/v1/chat/completions",
+      "quality": 4,
+      "cost": 0.0003,
+      "params": {
+        "temperature": 0.7,
+        "max_tokens": 8000
+      }
+    },
+    
+    "image": {
+      "model": "flux-pro",
+      "endpoint": "/api/v1/flux/generate",
+      "quality": 5,
+      "cost_per_image": 0.03,
+      "params": {
+        "aspect_ratio": "16:9",
+        "num_images": 1
+      },
+      "features": {
+        "synchronous": true,
+        "speed": "fast"
+      }
+    },
+    
+    "video": {
+      "model": "kling-v2",
+      "endpoint": "/v1/videos/kling/image-to-video",
+      "quality": 4,
+      "cost_per_video": 0.30,
+      "params": {
+        "duration": "10s",
+        "cfg_scale": 0.5
+      },
+      "features": {
+        "image_to_video": true,
+        "digital_human": true,
+        "lip_sync": true
+      }
+    },
+    
+    "audio": {
+      "model": "speech-02-turbo",
+      "endpoint": "/v1/audio/speech",
+      "quality": 5,
+      "cost_per_char": 0.001,
+      "params": {
+        "voice": "male-qn-jingying",
+        "response_format": "mp3"
+      },
+      "features": {
+        "emotion_tags": true,
+        "chinese_optimized": true
+      }
+    },
+    
+    "music": {
+      "model": "suno-custom",
+      "endpoint": "/api/v1/suno/custom",
+      "quality": 5,
+      "cost_per_track": 0.10,
+      "params": {
+        "tags": ["cinematic", "orchestral"],
+        "make_instrumental": true,
+        "duration": 90
+      }
+    }
+  },
+  
+  "cost_breakdown": {
+    "text_analysis": 0.0003,
+    "image_generation": 0.30,
+    "video_generation": 3.00,
+    "audio_synthesis": 1.00,
+    "background_music": 1.00,
+    "total": 5.30
+  },
+  
+  "quality_scores": {
+    "text_understanding": 4,
+    "image_quality": 5,
+    "video_quality": 4,
+    "audio_quality": 5,
+    "music_quality": 5,
+    "consistency": 5,
+    "overall": 4
+  },
+  
+  "use_cases": [
+    "日常使用",
+    "个人项目",
+    "成本敏感但追求质量"
+  ],
+  
+  "pros": [
+    "性价比最高",
+    "质量优秀",
+    "中文语音最佳",
+    "支持数字人"
+  ],
+  
+  "cons": [
+    "视频不是4K",
+    "时间较长 (23分钟)"
+  ],
+  
+  "recommended": true
+}
