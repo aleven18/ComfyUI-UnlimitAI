@@ -263,6 +263,11 @@ class StructuredOutputNode:
         Generate structured JSON output.
         """
         schema = json.loads(json_schema)
+        _JSON_SCHEMA_MODELS_SO = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "claude-3-5-sonnet-20241022"}
+        if model in _JSON_SCHEMA_MODELS_SO:
+            response_format_val = {"type": "json_schema", "json_schema": {"name": "structured_output", "schema": schema}}
+        else:
+            response_format_val = {"type": "json_object"}
         
         payload = {
             "model": model,
@@ -270,13 +275,7 @@ class StructuredOutputNode:
                 {"role": "user", "content": prompt}
             ],
             "temperature": temperature,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "structured_output",
-                    "schema": schema
-                }
-            }
+            "response_format": response_format_val
         }
         
         response = make_request("/v1/chat/completions", api_key, payload)
@@ -382,14 +381,12 @@ class NovelAnalyzerNode:
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "novel_scenes",
-                    "schema": schema
-                }
-            }
         }
+        _JSON_SCHEMA_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "claude-3-5-sonnet-20241022"}
+        if model in _JSON_SCHEMA_MODELS:
+            payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "novel_scenes", "schema": schema}}
+        else:
+            payload["response_format"] = {"type": "json_object"}
         
         response = make_request("/v1/chat/completions", api_key, payload)
         
