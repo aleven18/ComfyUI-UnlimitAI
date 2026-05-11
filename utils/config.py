@@ -41,7 +41,7 @@ class ModelConfig:
 class APIConfig:
     """API配置"""
     api_key: str
-    base_url: str = "https://api.unlimitai.com"
+    base_url: str = "https://api.unlimitai.org"
     timeout: int = 60
     max_retries: int = 3
 
@@ -219,7 +219,7 @@ class Config:
         return {
             "api": {
                 "api_key": "",
-                "base_url": "https://api.unlimitai.com",
+                "base_url": "https://api.unlimitai.org",
                 "timeout": 60,
                 "max_retries": 3,
             },

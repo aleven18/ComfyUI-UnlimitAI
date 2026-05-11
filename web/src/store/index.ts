@@ -20,6 +20,9 @@ const DEFAULT_STORYBOARD: StoryboardProject = {
   cameraControlJson: '',
   sound: 'off',
   selectedTemplateId: null,
+  cameraStyle: 'none',
+  voice: 'minimax-male-qn-jingying',
+  generateDialogue: 'off',
 };
 
 interface AppState {

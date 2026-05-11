@@ -11,9 +11,7 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 
 
-class APIError(Exception):
-    """API错误"""
-    pass
+from .exceptions import APIError
 
 
 class UnlimitAIClient:

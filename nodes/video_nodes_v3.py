@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 
 from typing_extensions import override
@@ -72,6 +73,19 @@ from ..utils.kling_helpers import (
     parse_camera_control as _parse_camera_control,
     kling_submit_poll_download as _kling_submit_poll_download,
 )
+
+logger = logging.getLogger(__name__)
+
+KLING_SOUND_SUPPORTED_MODELS = {"kling-v2-5-turbo", "kling-v2-6", "kling-v3", "kling-v3-omni", "kling-video-o1"}
+
+
+def _validate_kling_sound(sound: str, model_name: str, node_name: str) -> str | None:
+    if sound == "off":
+        return None
+    if model_name not in KLING_SOUND_SUPPORTED_MODELS:
+        logger.warning("[%s] sound='on' is not supported by model '%s'; ignoring. Supported: %s", node_name, model_name, sorted(KLING_SOUND_SUPPORTED_MODELS))
+        return None
+    return sound
 
 
 class KlingVideoV3Node(IO.ComfyNode):

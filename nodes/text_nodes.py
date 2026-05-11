@@ -91,6 +91,8 @@ class UnlimitAITextNode:
         
         response = make_request("/v1/chat/completions", api_key, payload)
         
+        if not response.get("choices"):
+            return ("", 0, 0, 0.0)
         text = response["choices"][0]["message"]["content"]
         usage = response.get("usage", {})
         input_tokens = usage.get("prompt_tokens", 0)
@@ -149,6 +151,8 @@ class GPT5ReasoningNode:
         
         response = make_request("/v1/chat/completions", api_key, payload)
         
+        if not response.get("choices"):
+            return ("", "", 0, 0, 0.0)
         message = response["choices"][0]["message"]
         text = message["content"]
         reasoning = message.get("reasoning_content", "")
@@ -209,6 +213,8 @@ class DeepSeekThinkingNode:
         
         response = make_request("/v1/chat/completions", api_key, payload)
         
+        if not response.get("choices"):
+            return ("", "", 0, 0, 0.0)
         message = response["choices"][0]["message"]
         text = message["content"]
         thinking = message.get("reasoning_content", "")
@@ -240,7 +246,7 @@ class StructuredOutputNode:
             }
         }
     
-    RETURN_TYPES = ("STRING", "DICT", "INT", "INT", "FLOAT")
+    RETURN_TYPES = ("STRING", "STRING", "INT", "INT", "FLOAT")
     RETURN_NAMES = ("json_string", "json_dict", "input_tokens", "output_tokens", "cost")
     FUNCTION = "generate_structured"
     CATEGORY = "UnlimitAI/Text"
@@ -252,7 +258,7 @@ class StructuredOutputNode:
         json_schema: str,
         model: str = "gpt-4o",
         temperature: float = 0.7
-    ) -> Tuple[str, Dict, int, int, float]:
+    ) -> Tuple[str, str, int, int, float]:
         """
         Generate structured JSON output.
         """
@@ -275,6 +281,8 @@ class StructuredOutputNode:
         
         response = make_request("/v1/chat/completions", api_key, payload)
         
+        if not response.get("choices"):
+            return ("", "{}", 0, 0, 0.0)
         text = response["choices"][0]["message"]["content"]
         data = json.loads(text)
         
@@ -283,7 +291,7 @@ class StructuredOutputNode:
         output_tokens = usage.get("completion_tokens", 0)
         cost = estimate_cost(model, input_tokens, output_tokens)
         
-        return (text, data, input_tokens, output_tokens, cost)
+        return (text, json.dumps(data, ensure_ascii=False), input_tokens, output_tokens, cost)
 
 
 class NovelAnalyzerNode:
@@ -385,6 +393,8 @@ class NovelAnalyzerNode:
         
         response = make_request("/v1/chat/completions", api_key, payload)
         
+        if not response.get("choices"):
+            return ("", "", 0, 0, 0.0)
         text = response["choices"][0]["message"]["content"]
         data = json.loads(text)
         
@@ -452,6 +462,8 @@ Return the translated JSON only, no additional text."""
         
         response = make_request("/v1/chat/completions", api_key, payload)
         
+        if not response.get("choices"):
+            return ("", 0, 0, 0.0)
         text = response["choices"][0]["message"]["content"]
         
         usage = response.get("usage", {})

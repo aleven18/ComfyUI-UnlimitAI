@@ -6,7 +6,7 @@
 api:
   # UnlimitAI API配置
   unlimitai:
-    base_url: "https://api.unlimitai.com"
+    base_url: "https://api.unlimitai.org"
     timeout: 60
     max_retries: 3
     

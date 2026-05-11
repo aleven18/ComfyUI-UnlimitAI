@@ -110,14 +110,6 @@ class FluxProNode:
         image_url = response.get("images", [{}])[0].get("url", "")
         
         image = url_to_comfy_image(image_url)
-        if image_url:
-            
-            with urllib.request.urlopen(image_url) as url_response:
-                img_data = url_response.read()
-                pil_image = Image.open(io.BytesIO(img_data))
-                pil_image = pil_image.convert("RGB")
-                img_array = np.array(pil_image).astype(np.float32) / 255.0
-                image = torch.from_numpy(img_array)[None,]
         
         return (image, image_url, request_id)
 
@@ -184,15 +176,7 @@ class FluxProKontextNode:
         request_id = response.get("request_id", "")
         result_url = response.get("images", [{}])[0].get("url", "")
         
-        image = None
-        if result_url:
-            
-            with urllib.request.urlopen(result_url) as url_response:
-                img_data = url_response.read()
-                pil_image = Image.open(io.BytesIO(img_data))
-                pil_image = pil_image.convert("RGB")
-                img_array = np.array(pil_image).astype(np.float32) / 255.0
-                image = torch.from_numpy(img_array)[None,]
+        image = url_to_comfy_image(result_url)
         
         return (image, result_url, request_id)
 
@@ -256,107 +240,8 @@ class IdeogramV3Node:
         image_url = response.get("data", [{}])[0].get("url", "")
         
         image = url_to_comfy_image(image_url)
-        if image_url:
-            
-            with urllib.request.urlopen(image_url) as url_response:
-                img_data = url_response.read()
-                pil_image = Image.open(io.BytesIO(img_data))
-                pil_image = pil_image.convert("RGB")
-                img_array = np.array(pil_image).astype(np.float32) / 255.0
-                image = torch.from_numpy(img_array)[None,]
         
         return (image, image_url, request_id)
-
-
-class KlingImageGenNode:
-    """
-    Kling image generation.
-    """
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "api_key": ("STRING", {"default": "", "multiline": False}),
-                "prompt": ("STRING", {"default": "", "multiline": True}),
-            },
-            "optional": {
-                "model": (["kling-v1", "kling-v1-5", "kling-v2"], {"default": "kling-v2"}),
-                "aspect_ratio": (["1:1", "16:9", "9:16", "4:3", "3:4"], {"default": "16:9"}),
-                "image_reference": ("STRING", {"default": "", "multiline": False}),
-                "image_reference_type": (["IMAGE_REFERENCE_TYPE_ALL", "IMAGE_REFERENCE_TYPE_APAINT", "IMAGE_REFERENCE_TYPE_FACE"], {"default": "IMAGE_REFERENCE_TYPE_ALL"}),
-                "negative_prompt": ("STRING", {"default": "", "multiline": True}),
-                "n": ("INT", {"default": 1, "min": 1, "max": 9}),
-                "seed": ("INT", {"default": -1, "min": -1, "max": 999999999}),
-                "callback_url": ("STRING", {"default": "", "multiline": False}),
-            }
-        }
-    
-    RETURN_TYPES = ("IMAGE", "STRING", "STRING")
-    RETURN_NAMES = ("image", "image_url", "task_id")
-    FUNCTION = "generate"
-    CATEGORY = "UnlimitAI/Image/Kling"
-    
-    def generate(
-        self,
-        api_key: str,
-        prompt: str,
-        model: str = "kling-v2",
-        aspect_ratio: str = "16:9",
-        image_reference: str = "",
-        image_reference_type: str = "IMAGE_REFERENCE_TYPE_ALL",
-        negative_prompt: str = "",
-        n: int = 1,
-        seed: int = -1,
-        callback_url: str = ""
-    ) -> Tuple[Any, str, str]:
-        """
-        Generate image with Kling.
-        """
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "aspect_ratio": aspect_ratio,
-            "n": n
-        }
-        
-        if image_reference:
-            payload["image_reference"] = image_reference
-            payload["image_reference_type"] = image_reference_type
-        
-        if negative_prompt:
-            payload["negative_prompt"] = negative_prompt
-        
-        if seed >= 0:
-            payload["seed"] = seed
-        
-        if callback_url:
-            payload["callback_url"] = callback_url
-        
-        response = make_request("/v1/images/kling", api_key, payload)
-        
-        task_id = response.get("data", {}).get("task_id", "")
-        
-        status_url = f"https://api.unlimitai.org/v1/images/kling/{task_id}"
-        result = poll_status(status_url, api_key, interval=3, max_attempts=200, success_status="succeed")
-        
-        task_status = result.get("data", {}).get("task_status", "")
-        if task_status != "succeed":
-            raise Exception(f"Image generation failed: {task_status}")
-        
-        image_url = result.get("data", {}).get("task_result", {}).get("images", [{}])[0].get("url", "")
-        
-        image = url_to_comfy_image(image_url)
-        if image_url:
-            
-            with urllib.request.urlopen(image_url) as url_response:
-                img_data = url_response.read()
-                pil_image = Image.open(io.BytesIO(img_data))
-                pil_image = pil_image.convert("RGB")
-                img_array = np.array(pil_image).astype(np.float32) / 255.0
-                image = torch.from_numpy(img_array)[None,]
-        
-        return (image, image_url, task_id)
 
 
 class GPTImageNode:
@@ -415,14 +300,6 @@ class GPTImageNode:
         revised_prompt = image_data.get("revised_prompt", "")
         
         image = url_to_comfy_image(image_url)
-        if image_url:
-            
-            with urllib.request.urlopen(image_url) as url_response:
-                img_data = url_response.read()
-                pil_image = Image.open(io.BytesIO(img_data))
-                pil_image = pil_image.convert("RGB")
-                img_array = np.array(pil_image).astype(np.float32) / 255.0
-                image = torch.from_numpy(img_array)[None,]
         
         return (image, image_url, revised_prompt)
 
@@ -490,14 +367,6 @@ class Imagen4Node:
             image_url = ""
         
         image = url_to_comfy_image(image_url)
-        if image_url:
-            
-            with urllib.request.urlopen(image_url) as url_response:
-                img_data = url_response.read()
-                pil_image = Image.open(io.BytesIO(img_data))
-                pil_image = pil_image.convert("RGB")
-                img_array = np.array(pil_image).astype(np.float32) / 255.0
-                image = torch.from_numpy(img_array)[None,]
         
         return (image, image_url, request_id)
 
@@ -562,16 +431,8 @@ class RecraftV3Node:
         image_url = response.get("images", [{}])[0].get("url", "")
         
         image = url_to_comfy_image(image_url)
-        if image_url:
-            
-            with urllib.request.urlopen(image_url) as url_response:
-                img_data = url_response.read()
-                pil_image = Image.open(io.BytesIO(img_data))
-                pil_image = pil_image.convert("RGB")
-                img_array = np.array(pil_image).astype(np.float32) / 255.0
-                image = torch.from_numpy(img_array)[None,]
         
-        return (image, image_url, request_id)
+        return (image, image_url, task_id)
 
 
 NODE_CLASS_MAPPINGS = {

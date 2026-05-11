@@ -1,13 +1,20 @@
 import json
 import logging
+import re
+import shutil
+import subprocess
+import tempfile
+from io import BytesIO
 from typing import Dict, Any, Optional
 
 from typing_extensions import override
 
-from comfy_api.latest import IO, ComfyExtension
+from comfy_api.latest import IO, ComfyExtension, InputImpl
 
 from ..unlimitai_util import (
     ApiEndpoint,
+    download_url_as_bytesio,
+    download_url_to_video_output,
     poll_op,
     poll_op_raw,
     prepare_image_input,
@@ -23,6 +30,8 @@ from ..apis.kling import (
     KLING_IMAGE2VIDEO_POLL,
     KLING_TEXT2VIDEO,
     KLING_TEXT2VIDEO_POLL,
+    KlingCameraConfig,
+    KlingCameraControl,
     KlingImage2VideoRequest,
     KlingImageGenRequest,
     KlingText2VideoRequest,
@@ -31,6 +40,7 @@ from ..apis.kling import (
     KlingPollResponse,
     kling_status_extractor,
 )
+from ..apis.minimax import MinimaxTTSRequest, MinimaxTTSResponse
 from ..apis.text import TextGenerationRequest, TextGenerationResponse, ChatMessage, extract_text_content
 from ..utils.smart_skip import SmartSkipper
 from ..utils.content_dedup import ContentDeduplicator
@@ -42,6 +52,7 @@ from ..utils.kling_helpers import (
     parse_camera_control as _parse_camera_control,
     kling_submit_poll_download as _kling_submit_poll_download,
 )
+from ..unlimitai_util.conversions import audio_bytes_to_audio_input
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +273,12 @@ class NovelToDramaV3Node(IO.ComfyNode):
                 "summary": {"type": "string"}
             }
         }
-        request = TextGenerationRequest(model=text_model, messages=[ChatMessage(role="user", content=prompt)], temperature=0.7, response_format={"type": "json_schema", "json_schema": {"name": "novel_scenes", "schema": schema}})
+        JSON_SCHEMA_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "claude-3-5-sonnet-20241022"}
+        if text_model in JSON_SCHEMA_MODELS:
+            response_format = {"type": "json_schema", "json_schema": {"name": "novel_scenes", "schema": schema}}
+        else:
+            response_format = {"type": "json_object"}
+        request = TextGenerationRequest(model=text_model, messages=[ChatMessage(role="user", content=prompt)], temperature=0.7, response_format=response_format)
         response: TextGenerationResponse = await sync_op(cls, endpoint=ApiEndpoint(path="/v1/chat/completions", method="POST"), data=request, response_model=TextGenerationResponse, api_key=key, wait_label="Analyzing novel", estimated_duration=20)
         text = extract_text_content(response.choices[0].message.content) if response.choices else ""
         if not text:
@@ -884,6 +900,184 @@ class StoryboardVideoV3Node(IO.ComfyNode):
         return IO.NodeOutput(video_output, task_id)
 
 
+CAMERA_PRESETS: Dict[str, KlingCameraConfig] = {
+    "dolly-in": KlingCameraConfig(zoom=-0.3),
+    "dolly-out": KlingCameraConfig(zoom=0.3),
+    "pan-left": KlingCameraConfig(horizontal=-0.5),
+    "pan-right": KlingCameraConfig(horizontal=0.5),
+    "tilt-up": KlingCameraConfig(vertical=0.5),
+    "tilt-down": KlingCameraConfig(vertical=-0.5),
+    "static": KlingCameraConfig(),
+    "orbit": KlingCameraConfig(pan=0.3, tilt=0.1),
+    "tracking": KlingCameraConfig(horizontal=0.4, zoom=-0.1),
+    "handheld": KlingCameraConfig(horizontal=0.1, vertical=0.05, roll=0.02),
+    "crane-up": KlingCameraConfig(vertical=0.4, tilt=-0.2),
+    "crane-down": KlingCameraConfig(vertical=-0.4, tilt=0.2),
+    "zoom-in": KlingCameraConfig(zoom=-0.4),
+    "zoom-out": KlingCameraConfig(zoom=0.4),
+    "slow-push": KlingCameraConfig(zoom=-0.15),
+    "reveal": KlingCameraConfig(pan=0.3, zoom=-0.2),
+}
+
+MINIMAX_VOICE_OPTIONS = [
+    "minimax-male-qn-qingse",
+    "minimax-male-qn-jingying",
+    "minimax-female-shaonv",
+    "minimax-female-yujie",
+    "minimax-presenter_male",
+    "minimax-presenter_female",
+    "minimax-audiobook_male_1",
+    "minimax-audiobook_male_2",
+]
+
+ALL_VOICE_OPTIONS = MINIMAX_VOICE_OPTIONS + [
+    "kling-alloy", "kling-echo", "kling-fable", "kling-onyx", "kling-nova", "kling-shimmer",
+]
+
+
+def _extract_setting_from_master(master_prompt: str) -> str:
+    m_setting = re.search(r'(?:2\.\s*)?SETTING[:\s]*\n(.+?)(?=\n\d\.\s|\Z)', master_prompt, re.DOTALL | re.IGNORECASE)
+    m_chars = re.search(r'(?:1\.\s*)?CHARACTERS[:\s]*\n(.+?)(?=\n\d\.\s|\Z)', master_prompt, re.DOTALL | re.IGNORECASE)
+    setting = m_setting.group(1).strip()[:256] if m_setting else ""
+    chars = m_chars.group(1).strip()[:256] if m_chars else ""
+    if setting or chars:
+        parts = []
+        if setting:
+            parts.append(f"Scene setting: {setting}")
+        if chars:
+            parts.append(f"Characters: {chars}")
+        return ". ".join(parts)
+    return ""
+
+
+def _map_camera_text_to_preset(camera_text: str) -> KlingCameraConfig | None:
+    if not camera_text:
+        return None
+    text_lower = camera_text.lower().strip()
+    for key, config in CAMERA_PRESETS.items():
+        if key.replace("-", " ") in text_lower or key in text_lower:
+            return config
+    if "dolly" in text_lower and "in" in text_lower:
+        return CAMERA_PRESETS["dolly-in"]
+    if "dolly" in text_lower and "out" in text_lower:
+        return CAMERA_PRESETS["dolly-out"]
+    if "track" in text_lower:
+        return CAMERA_PRESETS["tracking"]
+    if "handheld" in text_lower or "shake" in text_lower:
+        return CAMERA_PRESETS["handheld"]
+    if "crane" in text_lower and "up" in text_lower:
+        return CAMERA_PRESETS["crane-up"]
+    if "crane" in text_lower and "down" in text_lower:
+        return CAMERA_PRESETS["crane-down"]
+    if "zoom" in text_lower and "in" in text_lower:
+        return CAMERA_PRESETS["zoom-in"]
+    if "zoom" in text_lower and "out" in text_lower:
+        return CAMERA_PRESETS["zoom-out"]
+    if "pan" in text_lower and "left" in text_lower:
+        return CAMERA_PRESETS["pan-left"]
+    if "pan" in text_lower and "right" in text_lower:
+        return CAMERA_PRESETS["pan-right"]
+    if "tilt" in text_lower and "up" in text_lower:
+        return CAMERA_PRESETS["tilt-up"]
+    if "tilt" in text_lower and "down" in text_lower:
+        return CAMERA_PRESETS["tilt-down"]
+    if "orbit" in text_lower:
+        return CAMERA_PRESETS["orbit"]
+    if "reveal" in text_lower:
+        return CAMERA_PRESETS["reveal"]
+    if "push" in text_lower:
+        return CAMERA_PRESETS["slow-push"]
+    if "static" in text_lower or "wide" in text_lower or "still" in text_lower:
+        return CAMERA_PRESETS["static"]
+    return None
+
+
+def _parse_camera_values_from_segment(seg: dict) -> KlingCameraConfig | None:
+    cv = seg.get("camera_values")
+    if not cv or not isinstance(cv, dict):
+        return None
+    try:
+        return KlingCameraConfig(
+            horizontal=float(cv.get("horizontal", 0.0)),
+            vertical=float(cv.get("vertical", 0.0)),
+            pan=float(cv.get("pan", 0.0)),
+            tilt=float(cv.get("tilt", 0.0)),
+            roll=float(cv.get("roll", 0.0)),
+            zoom=float(cv.get("zoom", 0.0)),
+        )
+    except (ValueError, TypeError):
+        return None
+
+
+async def _tts_generate_dialogue(cls, dialogue_text: str, voice: str, api_key: str) -> tuple[bytes, str]:
+    if voice.startswith("kling-"):
+        voice_id = voice[len("kling-"):]
+        from ..apis.kling import KlingTTSRequest as _KlingTTSRequest, KLING_TTS
+        request = _KlingTTSRequest(text=dialogue_text[:1000], voice_id=voice_id, voice_language="zh", voice_speed=1.0)
+        response_dict = await sync_op_raw(
+            cls, endpoint=ApiEndpoint(path=KLING_TTS, method="POST"),
+            data=request, api_key=api_key,
+            wait_label="Step 4/6: Synthesizing dialogue (Kling)", estimated_duration=10,
+        )
+        audio_url = ""
+        if isinstance(response_dict, dict):
+            data = response_dict.get("data", {})
+            if isinstance(data, dict):
+                audio_url = data.get("url", "")
+                if not audio_url:
+                    task_result = data.get("task_result", {})
+                    if isinstance(task_result, dict):
+                        audios = task_result.get("audio", [])
+                        if audios and isinstance(audios[0], dict):
+                            audio_url = audios[0].get("url", "")
+        if not audio_url:
+            raise Exception("Kling TTS returned no audio URL.")
+        audio_bytesio = await download_url_as_bytesio(audio_url, cls=cls)
+        return audio_bytesio.getvalue(), audio_url
+    else:
+        minimax_voice = voice.replace("minimax-", "") if voice.startswith("minimax-") else voice
+        request = MinimaxTTSRequest(model="speech-01-turbo", text=dialogue_text, voice=minimax_voice, emotion="neutral", speed=1.0, format="mp3", sample_rate=32000)
+        response: MinimaxTTSResponse = await sync_op(
+            cls, endpoint=ApiEndpoint(path="/v1/audio/speech", method="POST"),
+            data=request, response_model=MinimaxTTSResponse, api_key=api_key,
+            wait_label="Step 4/6: Synthesizing dialogue (Minimax)", estimated_duration=10,
+        )
+        audio_url = response.audio_url
+        if not audio_url:
+            raise Exception("Minimax TTS returned no audio URL.")
+        audio_bytesio = await download_url_as_bytesio(audio_url, cls=cls)
+        return audio_bytesio.getvalue(), audio_url
+
+
+def _ffmpeg_mix_video_audio(video_bytes: bytes, audio_bytes: bytes) -> bytes | None:
+    if not shutil.which("ffmpeg"):
+        logger.warning("[STORYBOARD_PRO] ffmpeg not found, skipping mix")
+        return None
+    with tempfile.TemporaryDirectory() as tmpdir:
+        video_path = f"{tmpdir}/video.mp4"
+        audio_path = f"{tmpdir}/audio.mp3"
+        output_path = f"{tmpdir}/output.mp4"
+        with open(video_path, "wb") as f:
+            f.write(video_bytes)
+        with open(audio_path, "wb") as f:
+            f.write(audio_bytes)
+        cmd = ["ffmpeg", "-y", "-i", video_path, "-i", audio_path,
+               "-c:v", "copy", "-c:a", "aac", "-shortest", output_path]
+        try:
+            result = subprocess.run(cmd, capture_output=True, timeout=120)
+            if result.returncode != 0:
+                logger.warning("[STORYBOARD_PRO] ffmpeg mix failed: %s", result.stderr.decode()[:200])
+                return None
+            with open(output_path, "rb") as f:
+                return f.read()
+        except subprocess.TimeoutExpired:
+            logger.warning("[STORYBOARD_PRO] ffmpeg mix timed out")
+            return None
+        except Exception as e:
+            logger.warning("[STORYBOARD_PRO] ffmpeg mix error: %s", e)
+            return None
+
+
 class StoryboardProV3Node(IO.ComfyNode):
     META_INSTRUCTION_A = """You are an expert visual director and storyboard supervisor. Analyze the provided reference images and story description, then produce a MASTER PROMPT that serves as the visual bible for an AI-generated storyboard video.
 
@@ -934,12 +1128,14 @@ For each segment, provide:
 2. Camera movement (specific: "slow dolly-in from medium to close-up", "static wide shot", "handheld tracking")
 3. Duration in seconds (must be realistic for the action described)
 4. Negative prompt (artifacts to avoid)
+5. Dialogue line (Simplified Chinese, the character's spoken line for this segment, or empty string if no dialogue)
 
 Output a JSON array. Each element must have:
 - "prompt": the detailed English visual prompt (max 512 characters)
 - "camera": camera movement description
 - "duration": integer seconds
 - "negative": negative prompt
+- "dialogue": character dialogue in Chinese (empty string if none)
 
 Rules:
 - Total duration of all segments must exactly equal the video duration
@@ -950,13 +1146,50 @@ Rules:
 
 Output ONLY the JSON array, no other text."""
 
+    META_INSTRUCTION_B_CUSTOM_CAMERA = """You are an expert Storyboard-to-Video Prompt Engineer. Given a MASTER PROMPT (character/scene visual bible), generate detailed video prompts for each storyboard segment.
+
+For each segment, provide:
+1. A highly detailed visual prompt (English) describing:
+   - Character body motion and micro-expressions (be specific: "slowly raises her right hand", not "moves her hand")
+   - Hair and clothing physics (swaying, fluttering, rippling)
+   - Environmental dynamics (dust, rain, light changes, background motion)
+   - Object interactions if any
+   - Facial expression evolution
+2. Camera movement as numeric values:
+   - horizontal: left(-) to right(+) typically -1.0 to 1.0
+   - vertical: down(-) to up(+) typically -1.0 to 1.0
+   - pan: left(-) to right(+) typically -1.0 to 1.0
+   - tilt: down(-) to up(+) typically -1.0 to 1.0
+   - roll: counter-clockwise(-) to clockwise(+) typically -1.0 to 1.0
+   - zoom: zoom-in(-) to zoom-out(+) typically -1.0 to 1.0
+3. Duration in seconds (must be realistic for the action described)
+4. Negative prompt (artifacts to avoid)
+5. Dialogue line (Simplified Chinese, the character's spoken line for this segment, or empty string if none)
+
+Output a JSON array. Each element must have:
+- "prompt": the detailed English visual prompt (max 512 characters)
+- "camera_values": {"horizontal": 0.0, "vertical": 0.0, "pan": 0.0, "tilt": 0.0, "roll": 0.0, "zoom": 0.0}
+- "duration": integer seconds
+- "negative": negative prompt
+- "dialogue": character dialogue in Chinese (empty string if none)
+
+Rules:
+- Total duration of all segments must exactly equal the video duration
+- Character descriptions must stay consistent with the MASTER PROMPT
+- Each segment must feel like a natural continuation of the previous one
+- Durations should vary based on content complexity (simple reaction: 2-3s, dialogue: 3-5s, action: 4-6s)
+- Camera values should be subtle; values above 0.5 create very fast movement
+- Only the first segment's camera_values will be used as global camera control
+
+Output ONLY the JSON array, no other text."""
+
     @classmethod
     def define_schema(cls):
         return IO.Schema(
             node_id="StoryboardProV3Node",
             display_name="Storyboard Pro [V3]",
             category="api node/workflow/Storyboard",
-            description="One-click storyboard video generation: LLM analyzes characters → generates prompts → creates storyboard image → generates video with continuity.",
+            description="One-click storyboard video generation: LLM analyzes characters → generates prompts → creates storyboard image → TTS dialogue → generates video → ffmpeg mix.",
             inputs=[
                 IO.String.Input("api_key", default="", multiline=False, tooltip="UnlimitAI API key."),
                 IO.String.Input("story_description", multiline=True, default="", tooltip="One-sentence story description, e.g. 'A little fox accidentally wanders into a dark magical forest'"),
@@ -974,8 +1207,18 @@ Output ONLY the JSON array, no other text."""
                 IO.Combo.Input("mode", options=["std", "pro"], default="std", tooltip="std=720p, pro=1080p"),
                 IO.String.Input("negative_prompt", multiline=True, default="", optional=True, tooltip="Negative prompt for video generation."),
                 IO.Combo.Input("sound", options=["off", "on"], default="off", optional=True, tooltip="Generate ambient audio for the video."),
+                IO.Combo.Input("camera_style", options=["none", "simple", "custom"], default="none", tooltip="none=no camera control; simple=map LLM camera text to presets; custom=LLM outputs numeric camera values."),
+                IO.Combo.Input("voice", options=ALL_VOICE_OPTIONS, default="minimax-male-qn-jingying", tooltip="Voice for dialogue TTS. minimax-* = Minimax voices, kling-* = Kling preset voices."),
+                IO.Combo.Input("generate_dialogue", options=["off", "on"], default="off", tooltip="Generate dialogue audio via TTS and mix with video."),
             ],
-            outputs=[IO.Video.Output("video"), IO.String.Output("master_prompt"), IO.String.Output("video_prompts"), IO.String.Output("storyboard_image_url")],
+            outputs=[
+                IO.Video.Output("video"),
+                IO.String.Output("master_prompt"),
+                IO.String.Output("video_prompts"),
+                IO.String.Output("storyboard_image_url"),
+                IO.Audio.Output("dialogue_audio"),
+                IO.String.Output("dialogue_text"),
+            ],
             hidden=[IO.Hidden.unique_id],
             is_api_node=True,
         )
@@ -985,7 +1228,8 @@ Output ONLY the JSON array, no other text."""
                       image_reference: str = "subject", image_fidelity: float = 0.5, human_fidelity: float = 0.45,
                       text_model: str = "gpt-4o", image_model: str = "kling-v2", video_model: str = "kling-v2-master",
                       storyboard_count: int = 4, duration: str = "5", aspect_ratio: str = "16:9",
-                      cfg_scale: float = 0.5, mode: str = "std", negative_prompt: str = "", sound: str = "off"):
+                      cfg_scale: float = 0.5, mode: str = "std", negative_prompt: str = "", sound: str = "off",
+                      camera_style: str = "none", voice: str = "minimax-male-qn-jingying", generate_dialogue: str = "off"):
         validate_string(story_description, field_name="story_description")
         key = validate_api_key(api_key)
         char_urls = [u.strip() for u in character_image_urls.strip().split("\n") if u.strip()]
@@ -996,8 +1240,8 @@ Output ONLY the JSON array, no other text."""
             logger.warning(f"[STORYBOARD_PRO] Model '{text_model}' does not support vision; auto-upgrading to 'gpt-4o-mini' for Step 1")
             effective_text_model = "gpt-4o-mini"
 
-        # Step 1: LLM analyzes images + story → MASTER PROMPT
-        logger.info("[STORYBOARD_PRO] STEP 1/4: Analyzing characters and story...")
+        # Step 1/6: LLM analyzes images + story → MASTER PROMPT
+        logger.info("[STORYBOARD_PRO] STEP 1/6: Analyzing characters and story...")
         step1_content: str | list[dict]
         if char_urls:
             parts: list[dict] = [{"type": "text", "text": f"{cls.META_INSTRUCTION_A}\n\nStory Description:\n{story_description}"}]
@@ -1015,12 +1259,13 @@ Output ONLY the JSON array, no other text."""
         step1_response: TextGenerationResponse = await sync_op(
             cls, endpoint=ApiEndpoint(path="/v1/chat/completions", method="POST"),
             data=step1_request, response_model=TextGenerationResponse, api_key=key,
-            wait_label="Step 1/4: Analyzing characters", estimated_duration=20)
+            wait_label="Step 1/6: Analyzing characters", estimated_duration=20)
         master_prompt = extract_text_content(step1_response.choices[0].message.content) if step1_response.choices else ""
 
-        # Step 2: LLM → segment video prompts
-        logger.info("[STORYBOARD_PRO] STEP 2/4: Generating video script...")
-        step2_prompt = f"""{cls.META_INSTRUCTION_B}
+        # Step 2/6: LLM → segment video prompts + dialogue + camera
+        logger.info("[STORYBOARD_PRO] STEP 2/6: Generating video script...")
+        instruction_b = cls.META_INSTRUCTION_B_CUSTOM_CAMERA if camera_style == "custom" else cls.META_INSTRUCTION_B
+        step2_prompt = f"""{instruction_b}
 
 MASTER PROMPT:
 {master_prompt}
@@ -1037,7 +1282,7 @@ Output ONLY the JSON array:"""
         step2_response: TextGenerationResponse = await sync_op(
             cls, endpoint=ApiEndpoint(path="/v1/chat/completions", method="POST"),
             data=step2_request, response_model=TextGenerationResponse, api_key=key,
-            wait_label="Step 2/4: Generating video script", estimated_duration=20)
+            wait_label="Step 2/6: Generating video script", estimated_duration=20)
         segments_text = extract_text_content(step2_response.choices[0].message.content) if step2_response.choices else ""
 
         segments_data = parse_json_safe(segments_text, "segments")
@@ -1052,6 +1297,17 @@ Output ONLY the JSON array:"""
             for i, seg in enumerate(segments):
                 seg["duration"] = base + (1 if i < remainder else 0)
 
+        # P3: Merge negative prompts from all segments
+        all_negatives = []
+        seen_negatives = set()
+        for seg in segments:
+            neg = str(seg.get("negative", "")).strip()
+            if neg and neg not in seen_negatives:
+                all_negatives.append(neg)
+                seen_negatives.add(neg)
+        merged_negative = ", ".join(all_negatives)
+        final_negative = f"{negative_prompt}, {merged_negative}".strip(", ") if merged_negative else negative_prompt
+
         video_prompts_json = json.dumps(segments, ensure_ascii=False, indent=2)
         multi_prompt = []
         for i, seg in enumerate(segments):
@@ -1060,16 +1316,34 @@ Output ONLY the JSON array:"""
                 prompt_text = f"Scene {i+1}"
             multi_prompt.append(KlingMultiPromptItem(index=i+1, prompt=prompt_text, duration=str(seg.get("duration", 5))))
 
-        # Step 3: Generate storyboard image
+        # P2: Determine camera_control
+        camera_control: KlingCameraControl | None = None
+        if camera_style == "simple":
+            cam_text = segments[0].get("camera", "") if segments else ""
+            cam_config = _map_camera_text_to_preset(cam_text)
+            if cam_config:
+                camera_control = KlingCameraControl(type="simple", config=cam_config)
+                logger.info("[STORYBOARD_PRO] Camera (simple): mapped '%s' → %s", cam_text, cam_config)
+        elif camera_style == "custom":
+            cam_config = _parse_camera_values_from_segment(segments[0]) if segments else None
+            if cam_config:
+                camera_control = KlingCameraControl(type="simple", config=cam_config)
+                logger.info("[STORYBOARD_PRO] Camera (custom): %s", cam_config)
+
+        # Step 3/6: Generate storyboard image (P1: use SETTING from master_prompt)
         storyboard_image_url = ""
-        logger.info("[STORYBOARD_PRO] STEP 3/4: Generating storyboard image...")
+        logger.info("[STORYBOARD_PRO] STEP 3/6: Generating storyboard image...")
         first_prompt = multi_prompt[0].prompt if multi_prompt else story_description
+        setting_prompt = _extract_setting_from_master(master_prompt)
+        ref_prompt = setting_prompt or first_prompt
+        if setting_prompt:
+            logger.info("[STORYBOARD_PRO] Using SETTING-based prompt for reference image")
         try:
             ref_url = char_urls[0] if char_urls else ""
             if image_model.startswith("kling"):
                 kling_model = image_model
                 img_request = KlingImageGenRequest(
-                    model_name=kling_model, prompt=first_prompt, aspect_ratio=aspect_ratio, n=1,
+                    model_name=kling_model, prompt=ref_prompt, aspect_ratio=aspect_ratio, n=1,
                     image=ref_url if ref_url else None,
                     image_reference=image_reference if ref_url else None,
                     image_fidelity=image_fidelity if ref_url else None,
@@ -1078,40 +1352,39 @@ Output ONLY the JSON array:"""
                 img_submit: KlingSubmitResponse = await sync_op(
                     cls, endpoint=ApiEndpoint(path=KLING_IMAGE_GEN, method="POST"),
                     data=img_request, response_model=KlingSubmitResponse, api_key=key,
-                    wait_label="Step 3/4: Submitting storyboard image", estimated_duration=5)
+                    wait_label="Step 3/6: Submitting storyboard image", estimated_duration=5)
                 img_task_id = img_submit.data.task_id if img_submit.data else ""
                 if img_task_id:
-                    img_poll: KlingPollResponse = await poll_op_raw(
+                    img_poll: KlingPollResponse = await poll_op(
                         cls, poll_endpoint=ApiEndpoint(path=KLING_IMAGE_GEN_POLL.format(img_task_id), method="GET"),
-                        status_extractor=kling_status_extractor, api_key=key,
-                        completed_statuses=["succeed"], failed_statuses=["failed"],
+                        response_model=KlingPollResponse, status_extractor=kling_status_extractor,
+                        api_key=key, completed_statuses=["succeed"], failed_statuses=["failed"],
                         queued_statuses=["submitted", "processing"],
                         poll_interval=3.0, max_poll_attempts=200, estimated_duration=60)
-                    img_data = img_poll.get("data", {}) if isinstance(img_poll, dict) else {}
-                    img_result = img_data.get("task_result", {}) if isinstance(img_data, dict) else {}
-                    img_list = img_result.get("images", []) if isinstance(img_result, dict) else []
-                    storyboard_image_url = img_list[0].get("url", "") if img_list and isinstance(img_list[0], dict) else ""
+                    img_data = img_poll.data
+                    if img_data and img_data.task_result and img_data.task_result.images:
+                        storyboard_image_url = img_data.task_result.images[0].url
             elif image_model == "gpt-image":
                 from ..apis.openai import GPTImageRequest, GPTImageResponse
                 _gpt_size_map = {"16:9": "1536x1024", "9:16": "1024x1536", "1:1": "1024x1024"}
                 gpt_img_request = GPTImageRequest(
-                    prompt=first_prompt,
+                    prompt=ref_prompt,
                     size=_gpt_size_map.get(aspect_ratio, "1024x1024"),
                     quality="high", output_format="png",
                 )
                 gpt_img_response: GPTImageResponse = await sync_op(
                     cls, endpoint=ApiEndpoint(path="/v1/images/generations", method="POST"),
                     data=gpt_img_request, response_model=GPTImageResponse, api_key=key,
-                    wait_label="Step 3/4: Generating storyboard image (GPT)", estimated_duration=20)
+                    wait_label="Step 3/6: Generating storyboard image (GPT)", estimated_duration=20)
                 storyboard_image_url = gpt_img_response.data[0].url if gpt_img_response.data else ""
             elif image_model == "flux-pro":
                 from ..apis.flux import FluxProRequest, FluxProResponse
                 _flux_size_map = {"16:9": "landscape_16_9", "9:16": "portrait_9_16", "1:1": "square"}
-                flux_request = FluxProRequest(prompt=first_prompt, image_size=_flux_size_map.get(aspect_ratio, "landscape_16_9"), num_inference_steps=30, seed=0, guidance_scale=3.5, num_images=1, enable_safety_checker=True, output_format="jpeg", sync=True)
+                flux_request = FluxProRequest(prompt=ref_prompt, image_size=_flux_size_map.get(aspect_ratio, "landscape_16_9"), num_inference_steps=30, seed=0, guidance_scale=3.5, num_images=1, enable_safety_checker=True, output_format="jpeg", sync=True)
                 flux_response: FluxProResponse = await sync_op(
                     cls, endpoint=ApiEndpoint(path="/fal-ai/flux-pro", method="POST"),
                     data=flux_request, response_model=FluxProResponse, api_key=key,
-                    wait_label="Step 3/4: Generating storyboard image (FLUX)", estimated_duration=15)
+                    wait_label="Step 3/6: Generating storyboard image (FLUX)", estimated_duration=15)
                 storyboard_image_url = flux_response.images[0].url if flux_response.images else ""
             else:
                 logger.warning(f"[STORYBOARD_PRO] Unknown image_model '{image_model}', skipping Step 3")
@@ -1119,8 +1392,29 @@ Output ONLY the JSON array:"""
             logger.warning(f"[STORYBOARD_PRO] Step 3 failed, will use text-to-video: {e}")
             storyboard_image_url = ""
 
-        # Step 4: Generate storyboard video
-        logger.info("[STORYBOARD_PRO] STEP 4/4: Generating storyboard video...")
+        # Step 4/6: Generate dialogue audio (P4)
+        dialogue_audio_output = None
+        dialogue_text_str = ""
+        audio_bytes_raw = None
+        if generate_dialogue == "on":
+            all_dialogue = [str(s.get("dialogue", "")).strip() for s in segments if s.get("dialogue")]
+            dialogue_text_str = "\n".join(all_dialogue)
+            if dialogue_text_str.strip():
+                try:
+                    logger.info("[STORYBOARD_PRO] STEP 4/6: Generating dialogue audio...")
+                    audio_bytes_raw, _audio_url = await _tts_generate_dialogue(cls, dialogue_text_str, voice, key)
+                    dialogue_audio_output = audio_bytes_to_audio_input(audio_bytes_raw)
+                except Exception as e:
+                    logger.warning(f"[STORYBOARD_PRO] Step 4 TTS failed: {e}")
+                    dialogue_audio_output = None
+                    audio_bytes_raw = None
+            else:
+                logger.info("[STORYBOARD_PRO] STEP 4/6: No dialogue text extracted, skipping TTS")
+        else:
+            logger.info("[STORYBOARD_PRO] STEP 4/6: Dialogue generation disabled")
+
+        # Step 5/6: Generate storyboard video
+        logger.info("[STORYBOARD_PRO] STEP 5/6: Generating storyboard video...")
         combined_prompt = " ; ".join(mp.prompt for mp in multi_prompt)
 
         if storyboard_image_url:
@@ -1128,27 +1422,68 @@ Output ONLY the JSON array:"""
                 model_name=video_model, prompt=combined_prompt,
                 image=storyboard_image_url, duration=duration,
                 aspect_ratio=aspect_ratio, cfg_scale=cfg_scale, mode=mode,
-                negative_prompt=negative_prompt or None,
+                negative_prompt=final_negative or None,
                 sound=sound if sound != "off" else None,
                 multi_shot=True, shot_type="customize", multi_prompt=multi_prompt,
+                camera_control=camera_control,
             )
-            video_output, task_id = await _kling_submit_poll_download(
-                cls, KLING_IMAGE2VIDEO, KLING_IMAGE2VIDEO_POLL, video_request, key,
-                max_poll_attempts=240, estimated_duration=180)
+            submit_path = KLING_IMAGE2VIDEO
+            poll_path = KLING_IMAGE2VIDEO_POLL
         else:
             video_request = KlingText2VideoRequest(
                 model_name=video_model, prompt=combined_prompt,
                 duration=duration, aspect_ratio=aspect_ratio,
                 cfg_scale=cfg_scale, mode=mode,
-                negative_prompt=negative_prompt or None,
+                negative_prompt=final_negative or None,
                 sound=sound if sound != "off" else None,
                 multi_shot=True, shot_type="customize", multi_prompt=multi_prompt,
+                camera_control=camera_control,
             )
-            video_output, task_id = await _kling_submit_poll_download(
-                cls, KLING_TEXT2VIDEO, KLING_TEXT2VIDEO_POLL, video_request, key,
-                max_poll_attempts=240, estimated_duration=180)
+            submit_path = KLING_TEXT2VIDEO
+            poll_path = KLING_TEXT2VIDEO_POLL
 
-        return IO.NodeOutput(video_output, master_prompt, video_prompts_json, storyboard_image_url)
+        video_submit: KlingSubmitResponse = await sync_op(
+            cls, endpoint=ApiEndpoint(path=submit_path, method="POST"),
+            data=video_request, response_model=KlingSubmitResponse, api_key=key,
+            wait_label="Step 5/6: Submitting video", estimated_duration=5)
+        video_task_id = video_submit.data.task_id if video_submit.data else ""
+        if not video_task_id:
+            raise Exception(f"Video submit failed: {video_submit}")
+
+        video_poll: KlingPollResponse = await poll_op(
+            cls, poll_endpoint=ApiEndpoint(path=poll_path.format(video_task_id), method="GET"),
+            response_model=KlingPollResponse, status_extractor=kling_status_extractor,
+            api_key=key, completed_statuses=["succeed"], failed_statuses=["failed"],
+            queued_statuses=["submitted", "processing"],
+            poll_interval=5.0, max_poll_attempts=240, estimated_duration=180)
+
+        video_url = ""
+        if video_poll.data and video_poll.data.task_result and video_poll.data.task_result.videos:
+            video_url = video_poll.data.task_result.videos[0].url
+        if not video_url:
+            raise Exception("Video task completed but no video URL found.")
+
+        # Step 6/6: ffmpeg mix video + dialogue
+        final_video_output = None
+        if generate_dialogue == "on" and audio_bytes_raw is not None and dialogue_audio_output is not None:
+            logger.info("[STORYBOARD_PRO] STEP 6/6: Mixing video and dialogue audio...")
+            try:
+                video_bytesio = await download_url_as_bytesio(video_url, cls=cls)
+                video_bytes_raw = video_bytesio.getvalue()
+                mixed_bytes = _ffmpeg_mix_video_audio(video_bytes_raw, audio_bytes_raw)
+                if mixed_bytes:
+                    final_video_output = InputImpl.VideoFromFile(BytesIO(mixed_bytes))
+                    logger.info("[STORYBOARD_PRO] ffmpeg mix successful")
+                else:
+                    logger.warning("[STORYBOARD_PRO] ffmpeg mix failed, returning video without dialogue")
+            except Exception as e:
+                logger.warning(f"[STORYBOARD_PRO] Step 6 mix failed: {e}")
+
+        if final_video_output is None:
+            final_video_output = await download_url_to_video_output(video_url, cls=cls)
+
+        return IO.NodeOutput(final_video_output, master_prompt, video_prompts_json,
+                             storyboard_image_url, dialogue_audio_output, dialogue_text_str)
 
 
 class UnlimitAIWorkflowV3Extension(ComfyExtension):

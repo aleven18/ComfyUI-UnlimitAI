@@ -6,6 +6,7 @@ import { StoryboardSegment, StoryboardTemplate } from '@/types';
 import {
   Film, Sparkles, RotateCcw, Lightbulb,
   UserCircle, Camera, Eye, Image, Video, Wand2, CheckCircle2, Loader2,
+  Mic, Music, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { WorkflowManager } from '@/lib/workflow-manager';
 import { getApiKey } from '@/lib/unified-config';
@@ -19,9 +20,11 @@ function makeSegmentsFromTemplate(tpl: StoryboardTemplate, useExample: boolean):
 
 const STEP_LABELS = [
   { label: '角色与故事分析', icon: Eye, desc: 'LLM 分析角色图与故事描述' },
-  { label: '生成视频脚本', icon: Wand2, desc: '生成逐段视频提示词' },
-  { label: '生成分镜图', icon: Image, desc: 'AI 生成分镜画面' },
+  { label: '生成视频脚本', icon: Wand2, desc: '生成逐段视频提示词与对白' },
+  { label: '生成参考图', icon: Image, desc: 'AI 生成场景设定图' },
+  { label: '生成对白音频', icon: Mic, desc: 'TTS 合成角色对白' },
   { label: '生成故事板视频', icon: Video, desc: '合成连贯的故事板视频' },
+  { label: '音视频混合', icon: Film, desc: 'ffmpeg 混合视频+对白' },
 ];
 
 interface StoryboardPanelProps {
@@ -34,16 +37,18 @@ interface StoryboardPanelProps {
 }
 
 export function StoryboardPanel({ onGenerate, isConverting, progress = 0, currentNode, logs = [], error }: StoryboardPanelProps) {
-  const { storyboard, setStoryboard } = useAppStore();
+  const { storyboard, setStoryboard, result, outputs } = useAppStore();
   const { characters } = useProjectStore();
   const [showExamples, setShowExamples] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showResult, setShowResult] = useState(true);
+  const [masterPromptExpanded, setMasterPromptExpanded] = useState(false);
 
   const canGenerate = storyboard.storyDescription.trim().length > 0 && !isConverting;
 
   const update = (patch: Partial<typeof storyboard>) => setStoryboard({ ...storyboard, ...patch });
 
-  const currentStepIdx = isConverting ? Math.min(3, Math.floor(progress / 25)) : -1;
+  const currentStepIdx = isConverting ? Math.min(5, Math.floor(progress * 6 / 100)) : -1;
 
   const applyTemplate = (tpl: StoryboardTemplate, useExample: boolean) => {
     update({
@@ -69,6 +74,13 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
   const effectiveKey = getApiKey() || '';
   const validationErrors = effectiveKey ? WorkflowManager.validateStoryboardPro(effectiveKey, storyboard) : [];
 
+  const storyboardImageUrl = outputs?.find((o: any) => o.type === 'STRING' && o.url)?.url
+    || outputs?.find((o: any) => o.filename?.includes('storyboard_image'))?.url;
+  const masterPromptText = outputs?.find((o: any) => o.filename?.includes('master_prompt'))?.url;
+  const dialogueTextOutput = outputs?.find((o: any) => o.filename?.includes('dialogue_text'))?.url;
+  const videoPromptsOutput = outputs?.find((o: any) => o.filename?.includes('video_prompts'))?.url;
+  const hasResult = result?.status === 'completed' && outputs?.length > 0;
+
   return (
     <div className="space-y-6">
       {isConverting && (
@@ -84,7 +96,7 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {STEP_LABELS.map((step, i) => {
               const StepIcon = step.icon;
               const isComplete = isConverting ? i < currentStepIdx : false;
@@ -434,6 +446,46 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
               <option value="on">开启</option>
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">对白生成</label>
+            <select
+              value={storyboard.generateDialogue}
+              onChange={(e) => update({ generateDialogue: e.target.value as 'off' | 'on' })}
+              className="input-base"
+            >
+              <option value="off">关闭</option>
+              <option value="on">开启</option>
+            </select>
+          </div>
+          {storyboard.generateDialogue === 'on' && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">对白声音</label>
+              <select
+                value={storyboard.voice}
+                onChange={(e) => update({ voice: e.target.value })}
+                className="input-base"
+              >
+                <optgroup label="Minimax">
+                  <option value="minimax-male-qn-qingse">男声-青涩</option>
+                  <option value="minimax-male-qn-jingying">男声-精英</option>
+                  <option value="minimax-female-shaonv">女声-少女</option>
+                  <option value="minimax-female-yujie">女声-御姐</option>
+                  <option value="minimax-presenter_male">男声-主持</option>
+                  <option value="minimax-presenter_female">女声-主持</option>
+                  <option value="minimax-audiobook_male_1">男声-有声书1</option>
+                  <option value="minimax-audiobook_male_2">男声-有声书2</option>
+                </optgroup>
+                <optgroup label="Kling">
+                  <option value="kling-alloy">Alloy</option>
+                  <option value="kling-echo">Echo</option>
+                  <option value="kling-fable">Fable</option>
+                  <option value="kling-onyx">Onyx</option>
+                  <option value="kling-nova">Nova</option>
+                  <option value="kling-shimmer">Shimmer</option>
+                </optgroup>
+              </select>
+            </div>
+          )}
         </div>
 
         {showAdvanced && (
@@ -460,7 +512,22 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
                 className="w-full"
               />
             </div>
-            <div className="col-span-2">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">镜头控制</label>
+              <select
+                value={storyboard.cameraStyle}
+                onChange={(e) => update({ cameraStyle: e.target.value as 'none' | 'simple' | 'custom' })}
+                className="input-base"
+              >
+                <option value="none">关闭 — 无镜头控制</option>
+                <option value="simple">简单 — 自动映射镜头描述</option>
+                <option value="custom">自定义 — LLM 输出数值参数</option>
+              </select>
+              <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+                simple: 根据文本自动映射; custom: LLM 直接输出数值
+              </p>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">负面提示词</label>
               <input
                 type="text"
@@ -485,7 +552,6 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
         </button>
         <button
           onClick={() => {
-            const tpl = STORYBOARD_TEMPLATES[0];
             update({
               storyDescription: '',
               characterImageUrls: [],
@@ -495,6 +561,9 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
               negativePrompt: '',
               sound: 'off',
               selectedTemplateId: null,
+              cameraStyle: 'none',
+              voice: 'minimax-male-qn-jingying',
+              generateDialogue: 'off',
             });
           }}
           className="btn-secondary p-3"
@@ -515,6 +584,96 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
       {validationErrors.length > 0 && !isConverting && (
         <div className="p-3 bg-[var(--accent-warning)] bg-opacity-10 border border-[var(--accent-warning)] border-opacity-30 rounded-lg text-sm text-[var(--accent-warning)]">
           {validationErrors.join('；')}
+        </div>
+      )}
+
+      {hasResult && !isConverting && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-[var(--accent-success)]" />
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">生成结果</h2>
+            </div>
+            <button
+              onClick={() => setShowResult(!showResult)}
+              className="text-xs px-3 py-1 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded-lg flex items-center gap-1"
+            >
+              {showResult ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {showResult ? '收起' : '展开'}
+            </button>
+          </div>
+          {showResult && (
+            <div className="space-y-4">
+              {outputs?.filter((o: any) => o.type === 'VIDEO').map((o: any, i: number) => (
+                <div key={i}>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">视频</label>
+                  {o.url && (
+                    <video src={o.url} controls className="w-full rounded-lg border border-[var(--border-default)]" />
+                  )}
+                </div>
+              ))}
+              {outputs?.filter((o: any) => o.type === 'AUDIO').map((o: any, i: number) => (
+                <div key={`audio-${i}`}>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                    <Mic className="w-4 h-4 inline mr-1" />对白音频
+                  </label>
+                  {o.url && (
+                    <audio src={o.url} controls className="w-full" />
+                  )}
+                </div>
+              ))}
+              {outputs?.filter((o: any) => o.type === 'STRING').map((o: any, i: number) => {
+                const label = o.filename?.includes('master_prompt') ? 'Master Prompt (视觉圣经)'
+                  : o.filename?.includes('video_prompts') ? '分镜脚本'
+                  : o.filename?.includes('dialogue_text') ? '对白文本'
+                  : o.filename?.includes('storyboard_image') ? '参考图 URL'
+                  : `输出 ${i + 1}`;
+                if (o.filename?.includes('storyboard_image') && o.url) {
+                  return (
+                    <div key={`str-${i}`}>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                        <Image className="w-4 h-4 inline mr-1" />参考图
+                      </label>
+                      <img src={o.url} alt="参考图" className="max-w-sm rounded-lg border border-[var(--border-default)]" />
+                    </div>
+                  );
+                }
+                if (o.filename?.includes('master_prompt')) {
+                  return (
+                    <div key={`str-${i}`}>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Master Prompt (视觉圣经)</label>
+                      <div className="relative">
+                        <pre className={`text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg overflow-auto whitespace-pre-wrap ${
+                          !masterPromptExpanded ? 'max-h-24' : ''
+                        }`}>
+                          {o.url || o.filename || '—'}
+                        </pre>
+                        <button
+                          onClick={() => setMasterPromptExpanded(!masterPromptExpanded)}
+                          className="text-[10px] text-[var(--accent-primary)] mt-1 hover:underline"
+                        >
+                          {masterPromptExpanded ? '收起' : '展开全部'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+                if (o.filename?.includes('dialogue_text')) {
+                  return (
+                    <div key={`str-${i}`}>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                        <Mic className="w-4 h-4 inline mr-1" />对白文本
+                      </label>
+                      <pre className="text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg overflow-auto whitespace-pre-wrap">
+                        {o.url || o.filename || '—'}
+                      </pre>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

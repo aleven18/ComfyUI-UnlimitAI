@@ -213,7 +213,7 @@ def mock_config():
     """Mock配置"""
     return {
         "api_key": "test_api_key_12345",
-        "api_base_url": "https://api.unlimitai.com",
+        "api_base_url": "https://api.unlimitai.org",
         "default_model": {
             "text": "deepseek-chat",
             "image": "flux.1-schnell",

@@ -139,4 +139,7 @@ export interface StoryboardProject {
   cameraControlJson: string;
   sound: 'off' | 'on';
   selectedTemplateId: string | null;
+  cameraStyle: 'none' | 'simple' | 'custom';
+  voice: string;
+  generateDialogue: 'off' | 'on';
 }

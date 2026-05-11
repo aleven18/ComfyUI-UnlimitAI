@@ -141,10 +141,12 @@ export function useComfyUI() {
       const workflow = WorkflowManager.fillStoryboardProWorkflow(template, apiKey, storyboard);
 
       const STEP_LABELS = [
-        'Step 1/4: 角色与故事分析',
-        'Step 2/4: 生成视频脚本',
-        'Step 3/4: 生成分镜图',
-        'Step 4/4: 生成故事板视频',
+        'Step 1/6: 角色与故事分析',
+        'Step 2/6: 生成视频脚本',
+        'Step 3/6: 生成参考图',
+        'Step 4/6: 生成对白音频',
+        'Step 5/6: 生成故事板视频',
+        'Step 6/6: 音视频混合',
       ];
 
       const { promptId, outputs: wfOutputs } = await executeWorkflowWithProgress(
@@ -154,7 +156,7 @@ export function useComfyUI() {
             ? (progressData.value / progressData.max) * 100
             : 0;
           setProgress(percent);
-          const stepIdx = Math.min(3, Math.floor(percent / 25));
+          const stepIdx = Math.min(5, Math.floor(percent * 6 / 100));
           setCurrentNode(STEP_LABELS[stepIdx]);
         },
         (nodeId) => {
