@@ -5,7 +5,9 @@
  * 添加超时和速率限制保护
  */
 
-const API_BASE_URL = 'https://api.unlimitai.org';
+import { getUnifiedConfig } from './unified-config';
+
+const API_BASE_URL = () => getUnifiedConfig().apiBaseUrl;
 
 // 默认的图像生成模型列表（按优先级）
 const DEFAULT_IMAGE_MODELS = [
@@ -98,7 +100,7 @@ export async function generateCharacterImage(prompt: string): Promise<string> {
       const imageSize = '1024x1024';
       
       const response = await fetchWithTimeout(
-        `${API_BASE_URL}/v1/images/generations`,
+        `${API_BASE_URL()}/v1/images/generations`,
         {
           method: 'POST',
           headers: {

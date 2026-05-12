@@ -22,6 +22,10 @@ export class ComfyUIClient {
   private client: AxiosInstance;
   private ws: WebSocket | null = null;
   private wsCallbacks: WebSocketCallbacks | null = null;
+  private wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private wsReconnectAttempts = 0;
+  private static WS_MAX_RECONNECT = 5;
+  private static WS_RECONNECT_DELAY = 3000;
 
   constructor(baseURL: string = 'http://127.0.0.1:8188') {
     this.baseURL = baseURL;
@@ -109,9 +113,10 @@ export class ComfyUIClient {
     };
 
     this.ws.onclose = (event) => {
-      if (!event.wasClean) {
+      if (!event.wasClean && this.wsCallbacks) {
         console.warn('WebSocket disconnected unexpectedly:', event.code, event.reason);
         this.wsCallbacks?.onClose?.(event);
+        this.scheduleReconnect();
       }
       this.ws = null;
     };
@@ -120,11 +125,32 @@ export class ComfyUIClient {
   }
 
   disconnectWebSocket(): void {
+    if (this.wsReconnectTimer) {
+      clearTimeout(this.wsReconnectTimer);
+      this.wsReconnectTimer = null;
+      this.wsReconnectAttempts = 0;
+    }
     if (this.ws) {
       this.ws.onclose = null;
       this.ws.close();
       this.ws = null;
     }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.wsReconnectAttempts >= ComfyUIClient.WS_MAX_RECONNECT) {
+      console.error('WebSocket max reconnect attempts reached');
+      return;
+    }
+    this.wsReconnectAttempts++;
+    const delay = ComfyUIClient.WS_RECONNECT_DELAY * this.wsReconnectAttempts;
+    console.warn(`WebSocket reconnecting in ${delay}ms (attempt ${this.wsReconnectAttempts}/${ComfyUIClient.WS_MAX_RECONNECT})`);
+    this.wsReconnectTimer = setTimeout(() => {
+      if (this.wsCallbacks) {
+        this.connectWebSocket(this.wsCallbacks);
+        this.wsReconnectAttempts = 0;
+      }
+    }, delay);
   }
 
   getClientId(): string {

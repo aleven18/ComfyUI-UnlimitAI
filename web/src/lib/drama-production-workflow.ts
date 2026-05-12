@@ -79,7 +79,9 @@ const DEFAULT_CONFIG: ProductionConfig = {
   minRequestInterval: 120000
 };
 
-const API_BASE_URL = 'https://api.unlimitai.org';
+import { getUnifiedConfig } from './unified-config';
+
+const API_BASE_URL = () => getUnifiedConfig().apiBaseUrl;
 
 // ==================== 工具函数 ====================
 
@@ -391,7 +393,7 @@ ${novelText.substring(0, 3000)}
   private async callTextAPI(prompt: string): Promise<string> {
     await this.waitForRateLimit();
 
-    const response = await fetch(`${API_BASE_URL}/v1/chat/completions`, {
+    const response = await fetch(`${API_BASE_URL()}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
@@ -420,7 +422,7 @@ ${novelText.substring(0, 3000)}
   private async generateImage(prompt: string): Promise<string> {
     await this.waitForRateLimit();
 
-    const response = await fetch(`${API_BASE_URL}/v1/images/generations`, {
+    const response = await fetch(`${API_BASE_URL()}/v1/images/generations`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
@@ -455,7 +457,7 @@ ${novelText.substring(0, 3000)}
       { type: 'image_url', image_url: { url: firstFrame } }
     ];
 
-    const response = await fetch(`${API_BASE_URL}/volc/v1/contents/generations/tasks`, {
+    const response = await fetch(`${API_BASE_URL()}/volc/v1/contents/generations/tasks`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
@@ -508,7 +510,7 @@ ${novelText.substring(0, 3000)}
       image_url: { url: firstFrame }
     });
 
-    const response = await fetch(`${API_BASE_URL}/volc/v1/contents/generations/tasks`, {
+    const response = await fetch(`${API_BASE_URL()}/volc/v1/contents/generations/tasks`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
@@ -540,7 +542,7 @@ ${novelText.substring(0, 3000)}
 
     for (let attempt = 1; attempt <= 60; attempt++) {
       const response = await fetch(
-        `${API_BASE_URL}/volc/v1/contents/generations/tasks/${taskId}`,
+        `${API_BASE_URL()}/volc/v1/contents/generations/tasks/${taskId}`,
         {
           headers: { 'Authorization': `Bearer ${this.apiKey}` }
         }

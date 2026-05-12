@@ -271,7 +271,7 @@ class NovelToDramaV3Node(IO.ComfyNode):
 8. camera_movement: 镜头运动建议
 
 小说文本：
-{novel_text}"""
+{_sanitize_for_prompt(novel_text)}"""
         schema = {
             "type": "object",
             "properties": {
@@ -1061,6 +1061,24 @@ def _parse_camera_values_from_segment(seg: dict) -> KlingCameraConfig | None:
         return None
 
 
+_URL_RE = re.compile(r'^https?://[^\s<>"{}|\\^`\[\]]+$')
+
+
+def _validate_character_urls(character_image_urls: str) -> list[str]:
+    urls = [u.strip() for u in character_image_urls.strip().split("\n") if u.strip()]
+    for i, url in enumerate(urls):
+        if not _URL_RE.match(url):
+            raise ValidationError(f"character_image_urls line {i+1} is not a valid URL: {url[:80]}")
+    return urls
+
+
+def _sanitize_for_prompt(text: str, max_len: int = 2000) -> str:
+    sanitized = text[:max_len]
+    sanitized = sanitized.replace("```", " ")
+    sanitized = re.sub(r'<[^>]+>', '', sanitized)
+    return sanitized.strip()
+
+
 async def _tts_generate_dialogue(cls, dialogue_text: str, voice: str, api_key: str, language: str = "zh") -> tuple[bytes, str]:
     if voice.startswith("kling-"):
         voice_id = voice[len("kling-"):]
@@ -1343,29 +1361,63 @@ Output ONLY the JSON array, no other text."""
         key = validate_api_key(api_key)
         total_cost = 0.0
 
+        char_urls = _validate_character_urls(character_image_urls)
 
-        char_urls = [u.strip() for u in character_image_urls.strip().split("\n") if u.strip()]
-        _URL_RE = re.compile(r'^https?://[^\s<>"{}|\\^`\[\]]+$')
-        for i, url in enumerate(char_urls):
-            if not _URL_RE.match(url):
-                raise ValidationError(f"character_image_urls line {i+1} is not a valid URL: {url[:80]}")
+        # Step 1: LLM analyzes images + story → MASTER PROMPT
+        master_prompt, effective_text_model, total_cost = await cls._step1_analyze(
+            key, story_description, char_urls, text_model, total_cost)
 
+        # Step 2: LLM → segment video prompts + dialogue + camera
+        segments, multi_prompt, camera_control, final_negative, video_prompts_json, total_cost = await cls._step2_script(
+            key, master_prompt, text_model, effective_text_model, storyboard_count, duration,
+            camera_style, negative_prompt, total_cost)
+
+        # Step 3: Generate storyboard image
+        storyboard_image_url, total_cost = await cls._step3_image(
+            key, master_prompt, char_urls, image_model, aspect_ratio,
+            image_reference, image_fidelity, human_fidelity, multi_prompt,
+            story_description, total_cost)
+
+        # Step 4: Generate dialogue audio per-segment
+        dialogue_audio_output, dialogue_text_str, audio_bytes_raw = await cls._step4_tts(
+            key, segments, voice, duration, generate_dialogue)
+
+        # Step 5: Generate storyboard video
+        video_url, total_cost = await cls._step5_video(
+            key, storyboard_image_url, video_model, duration, aspect_ratio,
+            cfg_scale, mode, final_negative, sound, multi_prompt,
+            camera_control, total_cost)
+
+        # Step 6: ffmpeg mix video + dialogue
+        final_video_output = await cls._step6_mix(
+            video_url, generate_dialogue, audio_bytes_raw, dialogue_audio_output)
+
+        logger.info("[STORYBOARD_PRO] Total cost: $%.4f", total_cost)
+        cost_entry = {"total_cost": total_cost, "text_model": text_model, "image_model": image_model,
+                       "video_model": video_model, "duration": duration, "segments": storyboard_count,
+                       "timestamp": __import__("time").strftime("%Y-%m-%d %H:%M:%S")}
+        logger.info("[COST_AUDIT] %s", json.dumps(cost_entry, ensure_ascii=False))
+        return IO.NodeOutput(final_video_output, master_prompt, video_prompts_json,
+                             storyboard_image_url, dialogue_audio_output, dialogue_text_str,
+                             total_cost)
+
+    @classmethod
+    async def _step1_analyze(cls, key, story_description, char_urls, text_model, total_cost):
         VISION_MODELS = {"gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet-20241022"}
         effective_text_model = text_model
         if char_urls and text_model not in VISION_MODELS:
             logger.warning("[STORYBOARD_PRO] Model '%s' does not support vision; auto-upgrading to 'gpt-4o-mini' for Step 1", text_model)
             effective_text_model = "gpt-4o-mini"
 
-        # Step 1/6: LLM analyzes images + story → MASTER PROMPT
         logger.info("[STORYBOARD_PRO] STEP 1/6: Analyzing characters and story...")
         step1_content: str | list[dict]
         if char_urls:
-            parts: list[dict] = [{"type": "text", "text": f"{cls.META_INSTRUCTION_A}\n\nStory Description:\n{story_description}"}]
+            parts: list[dict] = [{"type": "text", "text": f"{cls.META_INSTRUCTION_A}\n\nStory Description:\n{_sanitize_for_prompt(story_description)}"}]
             for url in char_urls:
                 parts.append({"type": "image_url", "image_url": {"url": url}})
             step1_content = parts
         else:
-            step1_content = f"{cls.META_INSTRUCTION_A}\n\nStory Description:\n{story_description}"
+            step1_content = f"{cls.META_INSTRUCTION_A}\n\nStory Description:\n{_sanitize_for_prompt(story_description)}"
 
         step1_request = TextGenerationRequest(
             model=effective_text_model,
@@ -1386,13 +1438,18 @@ Output ONLY the JSON array, no other text."""
         if step1_response.usage:
             total_cost += (step1_response.usage.prompt_tokens / 1000 * s1_rates["input"]) + (step1_response.usage.completion_tokens / 1000 * s1_rates["output"])
 
-        # Step 2/6: LLM → segment video prompts + dialogue + camera
+        return master_prompt, effective_text_model, total_cost
+
+    @classmethod
+    async def _step2_script(cls, key, master_prompt, text_model, effective_text_model, storyboard_count, duration, camera_style, negative_prompt, total_cost):
+        VISION_MODELS = {"gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet-20241022"}
+        logger.info("[STORYBOARD_PRO] STEP 2/6: Generating video script...")
         logger.info("[STORYBOARD_PRO] STEP 2/6: Generating video script...")
         instruction_b = cls.META_INSTRUCTION_B_CUSTOM_CAMERA if camera_style == "custom" else cls.META_INSTRUCTION_B
         step2_prompt = f"""{instruction_b}
 
 MASTER PROMPT:
-{master_prompt}
+{_sanitize_for_prompt(master_prompt, 4000)}
 
 Generate exactly {storyboard_count} storyboard segments for a {duration}-second video.
 Total duration of all segments must equal {duration} seconds.
@@ -1487,6 +1544,12 @@ Output ONLY the JSON array:"""
                     logger.info("[STORYBOARD_PRO] Camera (custom): %s", cam_config)
                     break
 
+        return segments, multi_prompt, camera_control, final_negative, video_prompts_json, total_cost
+
+    @classmethod
+    async def _step3_image(cls, key, master_prompt, char_urls, image_model, aspect_ratio,
+                           image_reference, image_fidelity, human_fidelity, multi_prompt,
+                           story_description, total_cost):
         # Step 3/6: Generate storyboard image (P1: use SETTING from master_prompt)
         storyboard_image_url = ""
         logger.info("[STORYBOARD_PRO] STEP 3/6: Generating storyboard image...")
@@ -1593,6 +1656,10 @@ Output ONLY the JSON array:"""
         if storyboard_image_url:
             total_cost += IMAGE_PRICING.get(image_model, 0.3)
 
+        return storyboard_image_url, total_cost
+
+    @classmethod
+    async def _step4_tts(cls, key, segments, voice, duration, generate_dialogue):
         # Step 4/6: Generate dialogue audio per-segment
         dialogue_audio_output = None
         dialogue_text_str = ""
@@ -1633,6 +1700,12 @@ Output ONLY the JSON array:"""
         else:
             logger.info("[STORYBOARD_PRO] STEP 4/6: Dialogue generation disabled")
 
+        return dialogue_audio_output, dialogue_text_str, audio_bytes_raw
+
+    @classmethod
+    async def _step5_video(cls, key, storyboard_image_url, video_model, duration, aspect_ratio,
+                           cfg_scale, mode, final_negative, sound, multi_prompt,
+                           camera_control, total_cost):
         # Step 5/6: Generate storyboard video
         logger.info("[STORYBOARD_PRO] STEP 5/6: Generating storyboard video...")
         combined_prompt = " ; ".join(mp.prompt for mp in multi_prompt)
@@ -1686,6 +1759,10 @@ Output ONLY the JSON array:"""
 
         total_cost += VIDEO_PRICING.get(video_model, 2.0)
 
+        return video_url, total_cost
+
+    @classmethod
+    async def _step6_mix(cls, video_url, generate_dialogue, audio_bytes_raw, dialogue_audio_output):
         # Step 6/6: ffmpeg mix video + dialogue
         final_video_output = None
         if generate_dialogue == "on" and audio_bytes_raw is not None and dialogue_audio_output is not None:
@@ -1705,10 +1782,7 @@ Output ONLY the JSON array:"""
         if final_video_output is None:
             final_video_output = await download_url_to_video_output(video_url, cls=cls)
 
-        logger.info("[STORYBOARD_PRO] Total cost: $%.4f", total_cost)
-        return IO.NodeOutput(final_video_output, master_prompt, video_prompts_json,
-                             storyboard_image_url, dialogue_audio_output, dialogue_text_str,
-                             total_cost)
+        return final_video_output
 
 
 class UnlimitAIWorkflowV3Extension(ComfyExtension):

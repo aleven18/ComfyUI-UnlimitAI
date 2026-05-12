@@ -33,6 +33,25 @@
 
 ---
 
+### 🔄 V1/V2 vs V3 节点
+
+本项目提供两套节点体系：
+
+| 特性 | V1/V2 节点 | V3 节点 (推荐) |
+|------|-----------|---------------|
+| 命名 | `FluxProNode`, `KlingVideoNode` 等 | `FluxProV3Node`, `KlingVideoV3Node` 等 |
+| 架构 | `NODE_CLASS_MAPPINGS` 传统模式 | `IO.ComfyNode` Schema 模式 |
+| API 客户端 | 同步 `requests` | 异步 `aiohttp` |
+| 错误处理 | `raise Exception()` | `ValidationError` / `UnlimitAIError` |
+| 成本追踪 | 无 | `total_cost` 输出 |
+| 多镜头 | 不支持 | `multi_prompt` + `camera_control` |
+| 对白生成 | 单段 | 每段独立 TTS + ffmpeg 拼接 |
+| 滑块验证 | 无 | 值钳制 (camera) + URL 正则校验 |
+
+**建议**: 新项目统一使用 V3 节点。V1/V2 节点保留兼容，但不再新增功能。
+
+---
+
 ### ✨ 功能特性
 
 #### 1. 多模态内容生成

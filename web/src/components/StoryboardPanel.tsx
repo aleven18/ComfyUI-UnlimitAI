@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore } from '@/store';
 import { useProjectStore } from '@/store/projectStore';
 import { STORYBOARD_TEMPLATES, getTemplateById } from '@/data/storyboard-templates';
@@ -70,9 +70,9 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
     }
   };
 
-  const estimatedCost = WorkflowManager.estimateStoryboardProCost(storyboard);
   const effectiveKey = getApiKey() || '';
-  const validationErrors = effectiveKey ? WorkflowManager.validateStoryboardPro(effectiveKey, storyboard) : [];
+  const estimatedCost = useMemo(() => WorkflowManager.estimateStoryboardProCost(storyboard), [storyboard.storyDescription, storyboard.videoModel, storyboard.imageModel, storyboard.textModel, storyboard.mode]);
+  const validationErrors = useMemo(() => effectiveKey ? WorkflowManager.validateStoryboardPro(effectiveKey, storyboard) : [], [effectiveKey, storyboard.storyDescription, storyboard.storyboardCount, storyboard.duration]);
 
   const storyboardImageUrl = outputs?.find((o: any) => o.outputName === 'storyboard_image_url')?.text
     || outputs?.find((o: any) => o.outputName === 'storyboard_image_url')?.url;
@@ -564,8 +564,9 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
         </button>
         <button
           onClick={() => {
-            update({
-              storyDescription: '',
+            if (confirm('确定要重置所有配置吗？这将清空故事描述和所有设置。')) {
+              update({
+                storyDescription: '',
               characterImageUrls: [],
               storyboardCount: 4,
               duration: '5',
@@ -575,8 +576,9 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
               selectedTemplateId: null,
               cameraStyle: 'none',
               voice: 'minimax-male-qn-jingying',
-              generateDialogue: 'off',
-            });
+                generateDialogue: 'off',
+              });
+            }
           }}
           className="btn-secondary p-3"
           title="重置"
