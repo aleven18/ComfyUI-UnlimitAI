@@ -1,9 +1,9 @@
-type EventCallback = (data?: any) => void;
+type EventCallback = (data?: unknown) => void;
 
 class EventBus {
   private listeners: Map<string, EventCallback[]> = new Map();
 
-  emit(event: string, data?: any) {
+  emit(event: string, data?: unknown) {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       callbacks.forEach(callback => callback(data));

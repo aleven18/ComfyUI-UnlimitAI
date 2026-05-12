@@ -25,8 +25,8 @@ export function ApiKeyLogin({ onLogin, initialKey = '' }: ApiKeyLoginProps) {
     setLoading(true);
     try {
       onLogin(trimmed);
-    } catch (err: any) {
-      setError(err.message || '登录失败');
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : String(err)) || '登录失败');
     } finally {
       setLoading(false);
     }

@@ -6,15 +6,41 @@ export interface ComfyUINode {
   flags: {};
   order: number;
   mode: number;
-  properties: Record<string, any>;
-  widgets_values?: any[];
+  properties: Record<string, unknown>;
+  widgets_values?: unknown[];
+}
+
+export interface ComfyUILink {
+  id: number;
+  origin_id: number;
+  origin_slot: number;
+  target_id: number;
+  target_slot: number;
+  type: string;
 }
 
 export interface ComfyUIWorkflow {
   last_node_id: number;
   last_link_id: number;
   nodes: ComfyUINode[];
-  links: any[];
+  links: ComfyUILink[];
+}
+
+export interface ComfyUIOutputMedia {
+  filename: string;
+  subfolder: string;
+  type: string;
+}
+
+export interface ComfyUIOutputItem {
+  type: 'video' | 'audio' | 'image' | 'text';
+  url?: string;
+  filename?: string;
+  outputName?: string;
+  text?: string;
+  images?: ComfyUIOutputMedia[];
+  videos?: ComfyUIOutputMedia[];
+  audio?: ComfyUIOutputMedia[];
 }
 
 export interface QueuePromptRequest {
@@ -25,7 +51,7 @@ export interface QueuePromptRequest {
 export interface QueuePromptResponse {
   prompt_id: string;
   number: number;
-  node_errors?: Record<string, any>;
+  node_errors?: Record<string, unknown>;
 }
 
 export interface ProgressData {
@@ -39,12 +65,12 @@ export interface ExecutingData {
 
 export interface ExecutedData {
   node: string;
-  output: any;
+  output: Record<string, unknown>;
 }
 
 export interface WebSocketMessage {
   type: 'status' | 'progress' | 'executing' | 'executed' | 'execution_error';
-  data: ProgressData | ExecutingData | ExecutedData | any;
+  data: ProgressData | ExecutingData | ExecutedData | Record<string, unknown>;
 }
 
 export interface UploadResponse {
@@ -55,7 +81,7 @@ export interface UploadResponse {
 
 export interface HistoryEntry {
   prompt: ComfyUIWorkflow;
-  outputs: Record<string, any>;
+  outputs: Record<string, Record<string, unknown>>;
   status: {
     status_str: string;
     completed: boolean;
@@ -91,7 +117,7 @@ export interface ConversionResult {
   status: 'pending' | 'processing' | 'completed' | 'error';
   progress: number;
   currentNode?: string;
-  outputs: any[];
+  outputs: ComfyUIOutputItem[];
   error?: string;
 }
 
@@ -101,6 +127,14 @@ export interface StoryboardSegment {
   id: string;
   prompt: string;
   duration: number;
+}
+
+export interface ParsedStoryboardSegment {
+  duration?: number;
+  prompt?: string;
+  camera?: string;
+  dialogue?: string;
+  negative?: string;
 }
 
 export interface StoryboardTemplate {

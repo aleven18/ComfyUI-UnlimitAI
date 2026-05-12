@@ -3,6 +3,13 @@
  * 管理多场景的并行/串行生成
  */
 
+export interface ApiWorkflowNode {
+  class_type: string;
+  inputs: Record<string, unknown>;
+}
+
+export type ApiWorkflow = Record<string, ApiWorkflowNode>;
+
 import { comfyUIClient } from './comfyui-client';
 import { SceneGenerationParams } from './storyboard-to-workflow';
 
@@ -44,7 +51,7 @@ export class BatchSceneManager {
    */
   private async generateScene(
     scene: SceneGenerationParams,
-    workflow: any
+    workflow: ApiWorkflow
   ): Promise<SceneGenerationResult> {
     const result: SceneGenerationResult = {
       sceneIndex: scene.sceneIndex,
@@ -99,7 +106,7 @@ export class BatchSceneManager {
    */
   async generateAllScenes(
     scenes: SceneGenerationParams[],
-    workflow: any,
+    workflow: ApiWorkflow,
     options: {
       parallel?: boolean;
       maxParallel?: number;
@@ -186,7 +193,7 @@ export class BatchSceneManager {
   /**
    * 创建图像生成工作流
    */
-  private createImageWorkflow(scene: SceneGenerationParams, baseWorkflow: any): any {
+  private createImageWorkflow(scene: SceneGenerationParams, baseWorkflow: ApiWorkflow): ApiWorkflow {
     return {
       ...baseWorkflow,
       '1': {
@@ -207,9 +214,9 @@ export class BatchSceneManager {
    */
   private createVideoWorkflow(
     scene: SceneGenerationParams,
-    imageResult: any,
-    baseWorkflow: any
-  ): any {
+    imageResult: string,
+    baseWorkflow: ApiWorkflow
+  ): ApiWorkflow {
     return {
       ...baseWorkflow,
       '2': {
@@ -228,7 +235,7 @@ export class BatchSceneManager {
   /**
    * 创建音频生成工作流
    */
-  private createAudioWorkflow(scene: SceneGenerationParams, baseWorkflow: any): any {
+  private createAudioWorkflow(scene: SceneGenerationParams, baseWorkflow: ApiWorkflow): ApiWorkflow {
     return {
       ...baseWorkflow,
       '3': {

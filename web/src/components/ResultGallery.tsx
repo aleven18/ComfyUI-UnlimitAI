@@ -1,16 +1,17 @@
 import { Image, Download, Play, Film } from 'lucide-react';
 import { comfyUIClient } from '@/lib/comfyui-client';
+import { ComfyUIOutputItem, ComfyUIOutputMedia } from '@/types';
 
 interface ResultGalleryProps {
-  outputs: any[];
+  outputs: ComfyUIOutputItem[];
 }
 
 export function ResultGallery({ outputs }: ResultGalleryProps) {
   if (outputs.length === 0) return null;
 
-  const renderOutput = (output: any, idx: number) => {
+  const renderOutput = (output: ComfyUIOutputItem, idx: number) => {
     if (output.images && Array.isArray(output.images)) {
-      return output.images.map((img: any, imgIdx: number) => {
+      return output.images.map((img: ComfyUIOutputMedia, imgIdx: number) => {
         const imageUrl = comfyUIClient.getImageUrl(img.filename, img.subfolder, img.type);
         return (
           <div key={`${idx}-${imgIdx}`} className="card overflow-hidden">
@@ -27,7 +28,7 @@ export function ResultGallery({ outputs }: ResultGalleryProps) {
     }
 
     if (output.videos && Array.isArray(output.videos)) {
-      return output.videos.map((video: any, videoIdx: number) => {
+      return output.videos.map((video: ComfyUIOutputMedia, videoIdx: number) => {
         const videoUrl = comfyUIClient.getImageUrl(video.filename, video.subfolder, video.type);
         return (
           <div key={`${idx}-${videoIdx}`} className="card overflow-hidden">
@@ -44,7 +45,7 @@ export function ResultGallery({ outputs }: ResultGalleryProps) {
     }
 
     if (output.audio && Array.isArray(output.audio)) {
-      return output.audio.map((audio: any, audioIdx: number) => {
+      return output.audio.map((audio: ComfyUIOutputMedia, audioIdx: number) => {
         const audioUrl = comfyUIClient.getImageUrl(audio.filename, audio.subfolder, audio.type);
         return (
           <div key={`${idx}-${audioIdx}`} className="card p-4">

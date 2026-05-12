@@ -1,4 +1,4 @@
-import { ComfyUIWorkflow, ConversionParams, StoryboardProject, PresetType } from '@/types';
+import { ComfyUIWorkflow, ComfyUINode, ConversionParams, StoryboardProject, PresetType } from '@/types';
 import dramaV3Workflow from '../workflows/drama_v3_workflow.json';
 import storyboardWorkflow from '../workflows/storyboard_workflow.json';
 import storyboardProWorkflow from '../workflows/storyboard_pro_workflow.json';
@@ -107,7 +107,7 @@ export class WorkflowManager {
     const workflow = JSON.parse(JSON.stringify(template));
     const preset = PRESET_CONFIGS[params.preset as PresetType] || PRESET_CONFIGS.balanced;
 
-    workflow.nodes.forEach((node: any) => {
+    workflow.nodes.forEach((node: ComfyUINode) => {
       switch (node.type) {
         case 'NovelToDramaV3Node': {
           node.widgets_values = [
@@ -258,7 +258,7 @@ export class WorkflowManager {
       project.segments.map((s) => ({ prompt: s.prompt, duration: s.duration }))
     );
 
-    workflow.nodes.forEach((node: any) => {
+    workflow.nodes.forEach((node: ComfyUINode) => {
       if (node.type === 'StoryboardVideoV3Node') {
         node.widgets_values = [
           apiKey,
@@ -296,7 +296,7 @@ export class WorkflowManager {
   ): ComfyUIWorkflow {
     const workflow = JSON.parse(JSON.stringify(template));
 
-    workflow.nodes.forEach((node: any) => {
+    workflow.nodes.forEach((node: ComfyUINode) => {
       if (node.type === 'StoryboardProV3Node') {
         node.widgets_values = [
           apiKey,

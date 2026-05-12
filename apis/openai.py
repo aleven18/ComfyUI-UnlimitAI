@@ -3,6 +3,12 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+OPENAI_IMAGE_GENERATIONS = "/v1/images/generations"
+OPENAI_TTS = "/v1/audio/speech"
+OPENAI_WHISPER = "/v1/audio/transcriptions"
+OPENAI_CHAT_COMPLETIONS = "/v1/chat/completions"
+
+
 class GPTImageRequest(BaseModel):
     prompt: str
     model: str = "gpt-image-1"
@@ -76,3 +82,12 @@ class ChatCompletionResponse(BaseModel):
     model: str | None = None
     choices: list[ChatCompletionChoice] = Field(default_factory=list)
     usage: UsageInfo = Field(default_factory=UsageInfo)
+
+
+def openai_image_url_extractor(response: dict | GPTImageResponse) -> str:
+    if isinstance(response, dict):
+        data = response.get("data", [])
+        return data[0].get("url", "") if data else ""
+    if response.data:
+        return response.data[0].url or ""
+    return ""

@@ -20,7 +20,7 @@ interface Message {
 interface AIGuideCharacterCreationProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (characterData: any) => void;
+  onCreate: (characterData: Record<string, unknown>) => void;
 }
 
 export function AIGuideCharacterCreation({ isOpen, onClose, onCreate }: AIGuideCharacterCreationProps) {
@@ -175,11 +175,11 @@ ${JSON.stringify(collectedInfo, null, 2)}
       
       setMessages(prev => [...prev, assistantMessage]);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: `抱歉，我遇到了一些问题：${error.message}\n\n请重试或手动创建角色卡。`,
+        content: `抱歉，我遇到了一些问题：${(error instanceof Error ? error.message : String(error))}\n\n请重试或手动创建角色卡。`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);

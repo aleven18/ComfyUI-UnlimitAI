@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store';
+import { PresetType } from '@/types';
 import { FileJson, Check } from 'lucide-react';
 
 interface Workflow {
@@ -75,7 +76,7 @@ export function WorkflowSelector() {
                 ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] bg-opacity-5'
                 : 'border-[var(--border-subtle)] hover:border-[var(--accent-primary)] hover:border-opacity-50 hover:bg-[var(--bg-tertiary)]'}
             `}
-            onClick={() => setPreset(workflow.id as any)}
+            onClick={() => setPreset(workflow.id as PresetType)}
           >
             {preset === workflow.id && (
               <div className="absolute top-2 right-2">

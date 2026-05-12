@@ -1,4 +1,5 @@
 import { Shot } from '@/types/project';
+import { ComfyUIWorkflow } from '@/types';
 
 export type { Shot };
 
@@ -118,7 +119,7 @@ export class StoryboardToWorkflowConverter {
   static generateSceneWorkflowNodes(
     scene: SceneGenerationParams,
     nodeIdOffset: number
-  ): any {
+  ): Record<string, unknown> {
     const baseNodeId = nodeIdOffset;
 
     return {
@@ -161,14 +162,14 @@ export class StoryboardToWorkflowConverter {
 
   static generateMultiSceneWorkflow(
     workflowParams: ReturnType<typeof this.convertStoryboardToWorkflowParams>,
-    baseWorkflow: any
-  ): any {
+    baseWorkflow: ComfyUIWorkflow
+  ): ComfyUIWorkflow {
     const workflow = JSON.parse(JSON.stringify(baseWorkflow));
 
     let nodeIdOffset = 100;
-    const allSceneNodes: any = {};
-    const videoOutputs: any[] = [];
-    const audioOutputs: any[] = [];
+    const allSceneNodes: Record<string, unknown> = {};
+    const videoOutputs: [string, number][] = [];
+    const audioOutputs: [string, number][] = [];
 
     workflowParams.scenes.forEach((scene) => {
       const sceneNodes = this.generateSceneWorkflowNodes(scene, nodeIdOffset);

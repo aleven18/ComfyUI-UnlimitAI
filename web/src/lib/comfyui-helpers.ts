@@ -1,5 +1,5 @@
 import { comfyUIClient } from './comfyui-client';
-import { HistoryEntry } from '@/types';
+import { HistoryEntry, ComfyUIOutputMedia, ComfyUIWorkflow } from '@/types';
 
 export interface WorkflowOutput {
   type: 'image' | 'video' | 'audio' | 'text';
@@ -67,7 +67,7 @@ export function extractOutputs(history: HistoryEntry): WorkflowOutput[] {
     const nodeOutput = history.outputs[nodeId];
     
     if (nodeOutput.images && Array.isArray(nodeOutput.images)) {
-      nodeOutput.images.forEach((img: any) => {
+      nodeOutput.images.forEach((img: ComfyUIOutputMedia) => {
         outputs.push({
           type: 'image',
           nodeId,
@@ -80,7 +80,7 @@ export function extractOutputs(history: HistoryEntry): WorkflowOutput[] {
     }
     
     if (nodeOutput.videos && Array.isArray(nodeOutput.videos)) {
-      nodeOutput.videos.forEach((vid: any) => {
+      nodeOutput.videos.forEach((vid: ComfyUIOutputMedia) => {
         outputs.push({
           type: 'video',
           nodeId,
@@ -93,7 +93,7 @@ export function extractOutputs(history: HistoryEntry): WorkflowOutput[] {
     }
     
     if (nodeOutput.audio && Array.isArray(nodeOutput.audio)) {
-      nodeOutput.audio.forEach((aud: any) => {
+      nodeOutput.audio.forEach((aud: ComfyUIOutputMedia) => {
         outputs.push({
           type: 'audio',
           nodeId,
@@ -106,11 +106,12 @@ export function extractOutputs(history: HistoryEntry): WorkflowOutput[] {
     }
 
     if (nodeOutput.text && Array.isArray(nodeOutput.text)) {
-      nodeOutput.text.forEach((txt: any) => {
+      nodeOutput.text.forEach((txt: unknown) => {
+        const txtRec = txt as Record<string, unknown>;
         outputs.push({
           type: 'text', nodeId, filename: '', type_folder: 'output', url: '',
-          text: typeof txt === 'string' ? txt : (txt.text || String(txt)),
-          outputName: txt.name,
+          text: typeof txt === 'string' ? txt : String(txtRec.text || txt),
+          outputName: txtRec.name as string | undefined,
         });
       });
     }
@@ -156,10 +157,10 @@ function sleep(ms: number): Promise<void> {
 }
 
 export async function executeWorkflowWithProgress(
-  workflow: any,
+  workflow: ComfyUIWorkflow,
   onProgress?: (data: { value: number; max: number; nodeId?: string }) => void,
   onNodeStart?: (nodeId: string) => void,
-  onNodeComplete?: (nodeId: string, output: any) => void
+  onNodeComplete?: (nodeId: string, output: Record<string, unknown>) => void
 ): Promise<{ promptId: string; outputs: WorkflowOutput[] }> {
   comfyUIClient.connectWebSocket({
     onProgress: (progressData) => {

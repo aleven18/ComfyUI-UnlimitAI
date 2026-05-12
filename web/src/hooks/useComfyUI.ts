@@ -3,6 +3,7 @@ import { comfyUIClient } from '@/lib/comfyui-client';
 import { WorkflowManager } from '@/lib/workflow-manager';
 import { useAppStore } from '@/store';
 import { Shot } from '@/types/project';
+import { ConversionParams, ComfyUIOutputItem } from '@/types';
 import { StoryboardToNovelConverter } from '@/lib/storyboard-to-novel';
 import { 
   executeWorkflowWithProgress, 
@@ -85,7 +86,7 @@ export function useComfyUI() {
         ...params,
         ...workflowParams,
         apiKey,
-      } as any;
+      } as ConversionParams;
       
       const workflow = WorkflowManager.fillWorkflow(template, fullParams);
       
@@ -118,10 +119,11 @@ export function useComfyUI() {
       
       _setConverting(false);
       
-    } catch (err: any) {
-      setError(err.message || '转换失败');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg || '转换失败');
       _setConverting(false);
-      addLog(`[${ts()}] 错误: ${err.message}`);
+      addLog(`[${ts()}] 错误: ${msg}`);
     }
   };
 
@@ -170,7 +172,7 @@ export function useComfyUI() {
           addLog(`[${ts()}] 执行节点: ${nodeId}`);
         },
         (nodeId, output) => {
-          addOutput(output);
+          addOutput(output as unknown as ComfyUIOutputItem);
         },
       );
 
@@ -185,10 +187,10 @@ export function useComfyUI() {
 
       addLog(`[${ts()}] Storyboard Pro 生成完成!`);
       _setConverting(false);
-    } catch (err: any) {
-      setError(err.message || '转换失败');
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : String(err)) || '转换失败');
       _setConverting(false);
-      addLog(`[${ts()}] 错误: ${err.message}`);
+      addLog(`[${ts()}] 错误: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -203,7 +205,7 @@ export function useComfyUI() {
       setWorkflowOutputs([]);
 
       const apiKey = getEffectiveApiKey();
-      const fullParams = { ...WorkflowManager.getDefaultParams(preset), ...params, apiKey, preset } as any;
+      const fullParams = { ...WorkflowManager.getDefaultParams(preset), ...params, apiKey, preset } as ConversionParams;
       
       const errors = WorkflowManager.validateParams(fullParams);
       if (errors.length > 0) throw new Error(errors.join('\n'));
@@ -243,10 +245,10 @@ export function useComfyUI() {
 
       addLog(`[${ts()}] 转换完成!`);
       _setConverting(false);
-    } catch (err: any) {
-      setError(err.message || '转换失败');
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : String(err)) || '转换失败');
       _setConverting(false);
-      addLog(`[${ts()}] 错误: ${err.message}`);
+      addLog(`[${ts()}] 错误: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -255,8 +257,8 @@ export function useComfyUI() {
       await comfyUIClient.interrupt();
       _setConverting(false);
       setResult(result ? { ...result, status: 'error', error: '用户中断' } : null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 

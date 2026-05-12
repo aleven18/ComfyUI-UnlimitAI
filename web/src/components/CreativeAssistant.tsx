@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, Sparkles, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { chatWithAI } from '@/lib/ai-assistant-api';
 import { getUnifiedConfig as getConfig, hasApiKey } from '@/lib/unified-config';
+import { StoryboardProject } from '@/types';
 
 interface Message {
   id: string;
@@ -12,7 +13,7 @@ interface Message {
 
 interface CreativeAssistantProps {
   novelText?: string;
-  storyboard?: any;
+  storyboard?: StoryboardProject;
   currentPrompt?: string;
 }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Shot } from '@/types/project';
 import { 
   BookOpen, 
   Sparkles, 
@@ -19,9 +20,9 @@ export function CreationPanel() {
   
   const { createScene } = useProjectStore();
   
-  const handleStartGeneration = (shots: any[]) => {
+  const handleStartGeneration = (shots: Shot[]) => {
     shots.forEach(shot => {
-      createScene(shot);
+      createScene(shot as Partial<Shot>);
     });
     setActiveTab('storyboard');
   };

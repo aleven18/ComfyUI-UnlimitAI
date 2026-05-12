@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, Film, Workflow, FolderOpen, Settings, PenTool, Clapperboard } from 'lucide-react';
 import { useProjectStore } from '@/store/projectStore';
+import { ProjectSettings } from '@/types/project';
 import { CharacterManager } from '@/components/character/CharacterManager';
 import { SceneList } from '@/components/scene/SceneList';
 import { WorkflowConfig } from '@/components/workflow/WorkflowConfig';
@@ -161,7 +162,7 @@ function ProjectSettingsPanel() {
           </label>
           <select
             value={settings.style}
-            onChange={(e) => updateSettings({ style: e.target.value as any })}
+            onChange={(e) => updateSettings({ style: e.target.value as ProjectSettings['style'] })}
             className="input-base"
           >
             <option value="realistic">写实风格</option>
@@ -177,7 +178,7 @@ function ProjectSettingsPanel() {
           </label>
           <select
             value={settings.aspectRatio}
-            onChange={(e) => updateSettings({ aspectRatio: e.target.value as any })}
+            onChange={(e) => updateSettings({ aspectRatio: e.target.value as ProjectSettings['aspectRatio'] })}
             className="input-base"
           >
             <option value="16:9">16:9 (横屏)</option>

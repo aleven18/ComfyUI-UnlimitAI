@@ -66,11 +66,11 @@ export function TTSModelDiagnostic() {
         responseTime
       };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         model: modelId,
         available: false,
-        error: error.message || '请求失败',
+        error: (error instanceof Error ? error.message : String(error)) || '请求失败',
         responseTime: Date.now() - startTime
       };
     }

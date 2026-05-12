@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAppStore } from '@/store';
+import { PresetType } from '@/types';
 import { Sparkles, Clock, DollarSign, Film, AlertCircle } from 'lucide-react';
 
 export function SmartNovelInput() {
@@ -196,7 +197,7 @@ export function SmartNovelInput() {
                   ].map(mode => (
                     <button
                       key={mode.id}
-                      onClick={() => setPreset(mode.id as any)}
+                      onClick={() => setPreset(mode.id as PresetType)}
                       className={`p-2 rounded border text-xs ${
                         preset === mode.id
                           ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] bg-opacity-5 text-[var(--accent-primary)]'

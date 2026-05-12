@@ -155,9 +155,8 @@ export async function generateCharacterImage(prompt: string): Promise<string> {
       
       throw new Error('未能获取生成的图片');
       
-    } catch (error: any) {
-      // 超时错误
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
         console.log(`⏱️ 模型 ${model} 请求超时，尝试下一个...`);
         continue;
       }
@@ -167,7 +166,7 @@ export async function generateCharacterImage(prompt: string): Promise<string> {
         console.error('❌ 所有模型都尝试失败:', error);
         
         // 提供更友好的错误提示
-        if (error.message.includes('无可用渠道') || error.message.includes('请求过于频繁')) {
+        if ((error instanceof Error ? error.message : String(error)).includes('无可用渠道') || (error instanceof Error ? error.message : String(error)).includes('请求过于频繁')) {
           throw error;
         }
         
@@ -175,7 +174,7 @@ export async function generateCharacterImage(prompt: string): Promise<string> {
       }
       
       // 否则继续尝试下一个模型
-      console.log(`⚠️ 模型 ${model} 失败:`, error.message);
+      console.log(`⚠️ 模型 ${model} 失败:`, (error instanceof Error ? error.message : String(error)));
       
       // 在尝试下一个模型前等待一下
       if (i < IMAGE_MODELS.length - 1) {

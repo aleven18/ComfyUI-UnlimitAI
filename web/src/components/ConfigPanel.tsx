@@ -8,7 +8,7 @@ export function ConfigPanel() {
 
   const effectiveParams = { ...params, apiKey: params.apiKey || getApiKey() || '' };
 
-  const handleParamChange = (key: string, value: any) => {
+  const handleParamChange = (key: string, value: unknown) => {
     setParams({ [key]: value });
   };
 

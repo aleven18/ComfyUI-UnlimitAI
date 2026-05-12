@@ -10,8 +10,8 @@ import {
 export interface WebSocketCallbacks {
   onProgress?: (data: { value: number; max: number }) => void;
   onExecuting?: (node: string) => void;
-  onExecuted?: (node: string, output: any) => void;
-  onError?: (error: any) => void;
+  onExecuted?: (node: string, output: Record<string, unknown>) => void;
+  onError?: (error: unknown) => void;
   onClose?: (event: CloseEvent) => void;
 }
 
@@ -41,7 +41,7 @@ export class ComfyUIClient {
     return `client_${Math.random().toString(36).substring(2, 15)}`;
   }
 
-  async queuePrompt(workflow: ComfyUIWorkflow): Promise<string> {
+  async queuePrompt(workflow: ComfyUIWorkflow | Record<string, unknown>): Promise<string> {
     const response = await this.client.post<QueuePromptResponse>('/prompt', {
       prompt: workflow,
       client_id: this.clientId,
@@ -95,7 +95,7 @@ export class ComfyUIClient {
             this.wsCallbacks?.onExecuting?.((message.data as { node: string }).node);
             break;
           case 'executed':
-            const executedData = message.data as { node: string; output: any };
+            const executedData = message.data as { node: string; output: Record<string, unknown> };
             this.wsCallbacks?.onExecuted?.(executedData.node, executedData.output);
             break;
           case 'execution_error':

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-
 from typing import Literal
+
+
+IMAGEN4_GENERATE = "/imagen/v4/generate"
+IMAGEN4_POLL = "/imagen/v4/generate/{}"
 
 
 class Imagen4Request(BaseModel):
@@ -34,3 +37,12 @@ def imagen_status_extractor(response: dict | Imagen4PollResponse) -> str | None:
     if isinstance(response, dict):
         return response.get("status")
     return response.status
+
+
+def imagen_image_url_extractor(response: dict | Imagen4PollResponse) -> str:
+    if isinstance(response, dict):
+        output = response.get("output", [])
+        return output[0].get("url", "") if output else ""
+    if response.output:
+        return response.output[0].url
+    return ""

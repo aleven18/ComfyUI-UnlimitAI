@@ -136,7 +136,7 @@ ${novelText.substring(0, 3000)}
       
       if (jsonMatch) {
         const data = JSON.parse(jsonMatch[0]);
-        return (data.characters || []).map((c: any) => ({
+        return (data.characters || []).map((c: Record<string, string>) => ({
           id: generateId(),
           ...c,
           referenceImages: []
@@ -232,7 +232,7 @@ ${novelText.substring(0, 3000)}
       
       if (jsonMatch) {
         const data = JSON.parse(jsonMatch[0]);
-        return (data.scenes || []).map((s: any) => ({
+        return (data.scenes || []).map((s: Record<string, unknown>) => ({
           id: generateId(),
           ...s
         }));
@@ -327,7 +327,7 @@ ${novelText.substring(0, 3000)}
   async execute(
     novelText: string,
     projectName: string,
-    onProgress?: (step: string, data?: any) => void
+    onProgress?: (step: string, data?: unknown) => void
   ): Promise<DramaProduction> {
     console.log('\n🎭 开始漫剧制作工作流...\n');
 
@@ -491,7 +491,7 @@ ${novelText.substring(0, 3000)}
   ): Promise<string> {
     await this.waitForRateLimit();
 
-    const content: any[] = [
+    const content: Record<string, unknown>[] = [
       { type: 'text', text: prompt }
     ];
 

@@ -115,14 +115,14 @@ export const useProjectStore = create<ProjectState>()(
       loadProject: (projectId) => {
         const project = get().projects.find(p => p.id === projectId);
         if (project) {
-          const savedChars = (get() as any)[`chars_${projectId}`] || [];
-          const savedScenes = (get() as any)[`scenes_${projectId}`] || [];
+          const savedChars = ((get() as unknown) as Record<string, unknown>)[`chars_${projectId}`] as CharacterCard[] || [];
+          const savedScenes = ((get() as unknown) as Record<string, unknown>)[`scenes_${projectId}`] as Shot[] || [];
           const { currentProject: prevProject } = get();
           if (prevProject) {
             set({
               [`chars_${prevProject.id}`]: get().characters,
               [`scenes_${prevProject.id}`]: get().scenes,
-            } as any);
+            } as Record<string, unknown>);
           }
           set({
             currentProject: project,
@@ -151,7 +151,7 @@ export const useProjectStore = create<ProjectState>()(
           ),
           [`chars_${currentProject.id}`]: characters,
           [`scenes_${currentProject.id}`]: scenes,
-        } as any));
+        } as Record<string, unknown>));
       },
       
       updateProject: (updates) => {

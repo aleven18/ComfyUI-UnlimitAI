@@ -3,6 +3,12 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+FLUX_PRO_GENERATE = "/flux/v1/pro"
+FLUX_DEV_GENERATE = "/flux/v1/dev"
+FLUX_SCHNELL_GENERATE = "/flux/v1/schnell"
+FLUX_PRO_KONTEXT = "/flux/v1/pro/kontext"
+
+
 class FluxProRequest(BaseModel):
     prompt: str
     image_size: str = "landscape_16_9"
@@ -77,3 +83,12 @@ class FluxSchnellRequest(BaseModel):
 
 class FluxSchnellResponse(FluxProResponse):
     pass
+
+
+def flux_image_url_extractor(response: dict | FluxProResponse) -> str:
+    if isinstance(response, dict):
+        images = response.get("images", [])
+        return images[0]["url"] if images else ""
+    if response.images:
+        return response.images[0].url
+    return ""

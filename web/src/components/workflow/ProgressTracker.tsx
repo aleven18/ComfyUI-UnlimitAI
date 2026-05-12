@@ -1,9 +1,23 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, CheckCircle, Clock, AlertCircle, DollarSign, Loader2 } from 'lucide-react';
 
+interface ModuleResources {
+  images?: unknown[];
+  videos?: unknown[];
+  audios?: unknown[];
+}
+
 interface ModuleStatus {
   status: 'pending' | 'in_progress' | 'completed' | 'error';
-  data?: any;
+  data?: {
+    scene_count?: number;
+    total_characters?: number;
+    shot_count?: number;
+    total_duration?: number;
+    final_video_url?: string;
+    resources?: ModuleResources;
+    [key: string]: unknown;
+  };
   error?: string;
   cost?: number;
   updated_at?: string;
@@ -72,8 +86,8 @@ export function ProgressTracker({
       } else {
         throw new Error(data.error || '获取状态失败');
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : String(err)));
     } finally {
       setIsLoading(false);
     }

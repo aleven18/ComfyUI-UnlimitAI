@@ -80,12 +80,12 @@ export function SmartCreationPanel({ onNavigate }: SmartCreationPanelProps) {
       });
       
       setStep('completed');
-    } catch (err: any) {
-      setError(err.message || '生成分镜失败');
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : String(err)) || '生成分镜失败');
       setStep('input');
       updateTask(taskId, { 
         status: 'failed',
-        error: err.message
+        error: (err instanceof Error ? err.message : String(err))
       });
     }
   };

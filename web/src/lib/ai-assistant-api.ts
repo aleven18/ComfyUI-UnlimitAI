@@ -2,6 +2,11 @@
  * AI助手API客户端
  */
 
+interface AIContext {
+  novelText?: string;
+  storyboard?: StoryboardProject;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -16,6 +21,7 @@ interface ChatResponse {
 }
 
 import { getUnifiedConfig } from './unified-config';
+import { StoryboardProject } from '@/types';
 const API_BASE_URL = () => getUnifiedConfig().apiBaseUrl;
 
 // 默认使用DeepSeek Chat（推荐）
@@ -44,10 +50,7 @@ const SYSTEM_PROMPT = `你是一个专业的AI创作助手，精通：
 export async function chatWithAI(
   message: string,
   apiKey: string,
-  context?: {
-    novelText?: string;
-    storyboard?: any;
-  },
+  context?: AIContext,
   model: string = DEFAULT_MODEL,
   customSystemPrompt?: string,
   conversationHistory?: ChatMessage[]
@@ -113,7 +116,7 @@ export async function chatWithAI(
 /**
  * 构建上下文信息
  */
-function buildContext(context?: any): string {
+function buildContext(context?: AIContext): string {
   if (!context) return '';
   
   let parts = '\n\n【当前项目信息】';

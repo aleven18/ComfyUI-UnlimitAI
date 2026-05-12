@@ -75,8 +75,8 @@ export function CharacterEditor({ character, onSave, onClose }: CharacterEditorP
         ...formData,
         appearance: { ...formData.appearance!, referenceImage: imageUrl }
       });
-    } catch (error: any) {
-      setGenerateError(error.message || '生成失败');
+    } catch (error: unknown) {
+      setGenerateError((error instanceof Error ? error.message : String(error)) || '生成失败');
     } finally {
       setIsGeneratingImage(false);
     }
@@ -180,7 +180,7 @@ export function CharacterEditor({ character, onSave, onClose }: CharacterEditorP
                   </label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as CharacterCard['role'] })}
                     className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] text-[var(--text-primary)]"
                   >
                     <option value="protagonist">主角</option>
@@ -319,7 +319,7 @@ export function CharacterEditor({ character, onSave, onClose }: CharacterEditorP
                     value={formData.appearance?.gender}
                     onChange={(e) => setFormData({
                       ...formData,
-                      appearance: { ...formData.appearance!, gender: e.target.value as any }
+                      appearance: { ...formData.appearance!, gender: e.target.value as CharacterCard['appearance']['gender'] }
                     })}
                     className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] text-[var(--text-primary)]"
                   >
@@ -335,7 +335,7 @@ export function CharacterEditor({ character, onSave, onClose }: CharacterEditorP
                     value={formData.appearance?.ageRange}
                     onChange={(e) => setFormData({
                       ...formData,
-                      appearance: { ...formData.appearance!, ageRange: e.target.value as any }
+                      appearance: { ...formData.appearance!, ageRange: e.target.value as CharacterCard['appearance']['ageRange'] }
                     })}
                     className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] text-[var(--text-primary)]"
                   >
@@ -355,7 +355,7 @@ export function CharacterEditor({ character, onSave, onClose }: CharacterEditorP
                   value={formData.consistency?.style}
                   onChange={(e) => setFormData({
                     ...formData,
-                    consistency: { ...formData.consistency!, style: e.target.value as any }
+                    consistency: { ...formData.consistency!, style: e.target.value as CharacterCard['consistency']['style'] }
                   })}
                   className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] text-[var(--text-primary)]"
                 >
@@ -378,7 +378,7 @@ export function CharacterEditor({ character, onSave, onClose }: CharacterEditorP
                   value={formData.voice?.engine}
                   onChange={(e) => setFormData({
                     ...formData,
-                    voice: { ...formData.voice!, engine: e.target.value as any }
+                    voice: { ...formData.voice!, engine: e.target.value as CharacterCard['voice']['engine'] }
                   })}
                   className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] text-[var(--text-primary)]"
                 >

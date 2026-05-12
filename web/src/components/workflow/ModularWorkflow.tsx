@@ -14,10 +14,53 @@ import { StoryboardEditor } from '@/components/StoryboardEditor';
 import { CharacterImageSelector } from '@/components/workflow/CharacterImageSelector';
 import { ProgressTracker } from '@/components/workflow/ProgressTracker';
 import { useProjectStore } from '@/store/projectStore';
+import { Shot } from '@/types/project';
+
+interface ModuleInfo {
+  id: number;
+  key: '1_novel_analysis' | '2_character_creation' | '3_storyboard' | '4_resource_generation' | '5_final_composition';
+  title: string;
+  icon: string;
+  description: string;
+}
+
+interface CharacterInfo {
+  name: string;
+  role: string;
+  description: string;
+}
+
+interface GeneratedImage {
+  index: number;
+  url: string;
+  prompt: string;
+  composition: string;
+  variation: string;
+  seed: number;
+  quality_score: number;
+}
+
+interface CharacterData {
+  character_info: CharacterInfo;
+  generated_images?: GeneratedImage[];
+  selected_images?: GeneratedImage[];
+}
+
+interface ModuleData {
+  total_characters?: number;
+  characters?: CharacterData[];
+  storyboard?: { shots: unknown[] };
+  resources?: { images?: unknown[]; videos?: unknown[]; audios?: unknown[] };
+  final_video_url?: string;
+  project_id?: string;
+  completed_at?: string;
+  output_format?: string;
+  quality?: string;
+}
 
 interface ModuleState {
   status: 'pending' | 'in_progress' | 'completed' | 'error';
-  data?: any;
+  data?: ModuleData;
   error?: string;
   cost?: number;
 }
@@ -54,7 +97,7 @@ export function ModularWorkflow() {
   const [novelText, setNovelText] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [characterSelections, setCharacterSelections] = useState<Map<number, any[]>>(new Map());
+  const [characterSelections, setCharacterSelections] = useState<Map<number, GeneratedImage[]>>(new Map());
   
   // 从项目设置读取API Key
   useEffect(() => {
@@ -63,7 +106,7 @@ export function ModularWorkflow() {
     }
   }, [settings.apiKey]);
 
-  const modules = [
+  const modules: ModuleInfo[] = [
     { id: 1, key: '1_novel_analysis' as const, title: '小说分析与场景规划', icon: '📖', description: '智能分析小说，自动识别场景' },
     { id: 2, key: '2_character_creation' as const, title: '角色创建', icon: '🎭', description: '提取角色信息，生成参考图' },
     { id: 3, key: '3_storyboard' as const, title: '分镜脚本生成', icon: '🎬', description: '为每个场景生成详细分镜' },
@@ -121,10 +164,10 @@ export function ModularWorkflow() {
         projectId: data.project_id
       }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateModuleState('1_novel_analysis', {
         status: 'error',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setIsProcessing(false);
@@ -167,10 +210,10 @@ export function ModularWorkflow() {
       // 不自动跳转到模块3，让用户先选择图片
       // setWorkflowState(prev => ({ ...prev, currentModule: 3 }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateModuleState('2_character_creation', {
         status: 'error',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setIsProcessing(false);
@@ -178,7 +221,7 @@ export function ModularWorkflow() {
   };
 
   // ✅ 用户选择角色图片
-  const handleImageSelection = async (characterIndex: number, selectedImages: any[]) => {
+  const handleImageSelection = async (characterIndex: number, selectedImages: GeneratedImage[]) => {
     try {
       const response = await fetch('/api/module2/select-images', {
         method: 'POST',
@@ -216,9 +259,9 @@ export function ModularWorkflow() {
       } else {
         alert(`保存失败: ${data.error}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('保存图片选择失败:', error);
-      alert(`保存失败: ${error.message}`);
+      alert(`保存失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -227,7 +270,7 @@ export function ModularWorkflow() {
     const module2Data = workflowState.modules['2_character_creation'].data;
     if (!module2Data || !module2Data.characters) return false;
 
-    return module2Data.characters.every((char: any) => {
+    return module2Data.characters.every((char: CharacterData) => {
       return char.selected_images && char.selected_images.length >= 3;
     });
   };
@@ -267,10 +310,10 @@ export function ModularWorkflow() {
 
       setWorkflowState(prev => ({ ...prev, currentModule: 4 }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateModuleState('3_storyboard', {
         status: 'error',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setIsProcessing(false);
@@ -315,10 +358,10 @@ export function ModularWorkflow() {
 
       setWorkflowState(prev => ({ ...prev, currentModule: 5 }));
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateModuleState('4_resource_generation', {
         status: 'error',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setIsProcessing(false);
@@ -356,10 +399,10 @@ export function ModularWorkflow() {
         cost: 0.10
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateModuleState('5_final_composition', {
         status: 'error',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     } finally {
       setIsProcessing(false);
@@ -496,7 +539,7 @@ export function ModularWorkflow() {
 
 // 模块卡片组件
 function ModuleCard({ module, state, isActive, onClick }: { 
-  module: any; 
+  module: ModuleInfo; 
   state: { status: 'pending' | 'in_progress' | 'completed' | 'error'; cost?: number }; 
   isActive: boolean; 
   onClick: () => void 
@@ -547,6 +590,19 @@ function ModuleCard({ module, state, isActive, onClick }: {
 }
 
 // 模块详情组件
+interface ModuleDetailProps {
+  moduleId: number;
+  moduleState: ModuleState;
+  novelText: string;
+  setNovelText: (text: string) => void;
+  apiKey: string;
+  setApiKey: (key: string) => void;
+  isProcessing: boolean;
+  onConfirm: (moduleId: number) => void;
+  onProcess?: () => void;
+  onImageSelection: (characterIndex: number, selectedImages: GeneratedImage[]) => void;
+}
+
 function ModuleDetail({ 
   moduleId, 
   moduleState, 
@@ -558,7 +614,7 @@ function ModuleDetail({
   onConfirm, 
   onProcess,
   onImageSelection 
-}: any) {
+}: ModuleDetailProps) {
   const moduleConfigs = {
     1: { title: '📖 模块1：小说分析与场景规划', description: '输入小说文本，系统将自动分析并识别场景' },
     2: { title: '🎭 模块2：角色创建', description: '系统将提取角色信息并生成参考图' },
@@ -639,7 +695,7 @@ function ModuleDetail({
                 </p>
               </div>
 
-              {moduleState.data.characters.map((char: any, index: number) => (
+              {(moduleState.data.characters || []).map((char: CharacterData, index: number) => (
                 <div key={index} className="bg-[var(--bg-tertiary)] rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -651,8 +707,8 @@ function ModuleDetail({
                         已生成: {char.generated_images?.length || 0}张
                       </div>
                       <div className="text-xs font-medium mt-1">
-                        {char.selected_images?.length >= 3 ? (
-                          <span className="text-[var(--success)]">✓ 已选择 {char.selected_images.length}张</span>
+                        {(char.selected_images || []).length >= 3 ? (
+                          <span className="text-[var(--success)]">✓ 已选择 {(char.selected_images || []).length}张</span>
                         ) : (
                           <span className="text-[var(--warning)]">需选择 {3 - (char.selected_images?.length || 0)}张</span>
                         )}
@@ -678,14 +734,14 @@ function ModuleDetail({
               <div className="flex gap-3">
                 <button
                   onClick={() => onConfirm(2)}
-                  disabled={!moduleState.data.characters.every((char: any) => char.selected_images?.length >= 3)}
+                  disabled={!(moduleState.data.characters || []).every((char: CharacterData) => (char.selected_images || []).length >= 3)}
                   className="flex-1 py-3 bg-[var(--success)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ✅ 确认角色并继续到模块3
                 </button>
               </div>
               
-              {!moduleState.data.characters.every((char: any) => char.selected_images?.length >= 3) && (
+              {!(moduleState.data.characters || []).every((char: CharacterData) => (char.selected_images || []).length >= 3) && (
                 <div className="text-sm text-[var(--warning)] bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-lg p-3">
                   ⚠️ 请为所有角色选择至少3张参考图片后才能继续
                 </div>
@@ -716,11 +772,11 @@ function ModuleDetail({
               {/* 分镜编辑器 */}
               <StoryboardEditor
                 novelText={novelText}
-                shots={moduleState.data.storyboard?.shots || []}
-                onShotsChange={(shots: any) => {
+                shots={(moduleState.data.storyboard?.shots || []) as Shot[]}
+                onShotsChange={(shots: unknown[]) => {
                   console.log('用户编辑了分镜:', shots);
                 }}
-                onStartGeneration={(shots: any) => {
+                onStartGeneration={(shots: unknown[]) => {
                   console.log('开始生成分镜:', shots);
                 }}
               />

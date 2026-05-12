@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ConversionParams, ConversionResult, PresetType, StoryboardProject } from '@/types';
+import { ConversionParams, ConversionResult, PresetType, StoryboardProject, ComfyUIOutputItem } from '@/types';
 
 const DEFAULT_STORYBOARD: StoryboardProject = {
   storyDescription: '',
@@ -44,8 +44,8 @@ interface AppState {
   currentNode: string | null;
   setCurrentNode: (node: string | null) => void;
   
-  outputs: any[];
-  addOutput: (output: any) => void;
+  outputs: ComfyUIOutputItem[];
+  addOutput: (output: ComfyUIOutputItem) => void;
   clearOutputs: () => void;
   
   logs: string[];

@@ -42,7 +42,7 @@ export function CharacterManager() {
     setIsCreating(false);
   };
   
-  const handleAIGuideCreate = (characterData: any) => {
+  const handleAIGuideCreate = (characterData: Record<string, unknown>) => {
     createCharacter(characterData);
   };
   

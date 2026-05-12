@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Play, Pause, DollarSign } from 'lucide-react';
+import { PresetType } from '@/types';
 import { useProjectStore } from '@/store/projectStore';
 import { useComfyUI } from '@/hooks/useComfyUI';
 
@@ -84,7 +85,7 @@ export function WorkflowPanel() {
           ].map(option => (
             <button
               key={option.id}
-              onClick={() => setPreset(option.id as any)}
+              onClick={() => setPreset(option.id as PresetType)}
               className={`p-4 border rounded-lg text-left ${
                 preset === option.id 
                   ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] bg-opacity-10' 

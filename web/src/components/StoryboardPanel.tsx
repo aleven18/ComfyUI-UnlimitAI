@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useAppStore } from '@/store';
 import { useProjectStore } from '@/store/projectStore';
 import { STORYBOARD_TEMPLATES, getTemplateById } from '@/data/storyboard-templates';
-import { StoryboardSegment, StoryboardTemplate, StoryboardProject } from '@/types';
+import { StoryboardSegment, StoryboardTemplate, StoryboardProject, ComfyUIOutputItem, ParsedStoryboardSegment } from '@/types';
 import {
   Film, Sparkles, RotateCcw, Lightbulb,
   UserCircle, Camera, Eye, Image, Video, Wand2, CheckCircle2, Loader2,
@@ -12,6 +12,37 @@ import { WorkflowManager } from '@/lib/workflow-manager';
 import { getApiKey } from '@/lib/unified-config';
 
 function newSegId() { return `seg_${crypto.randomUUID()}`; }
+
+function DebouncedSlider({ value, onChange, min, max, step, label, debounceMs = 150 }: {
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  label: string;
+  debounceMs?: number;
+}) {
+  const [local, setLocal] = useState(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    setLocal(v);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => onChange(v), debounceMs);
+  }, [onChange, debounceMs]);
+
+  useMemo(() => { setLocal(value); }, [value]);
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+        {label}: {local}
+      </label>
+      <input type="range" min={min} max={max} step={step} value={local} onChange={handleChange} className="w-full" />
+    </div>
+  );
+}
 
 function makeSegmentsFromTemplate(tpl: StoryboardTemplate, useExample: boolean): StoryboardSegment[] {
   const src = useExample ? tpl.example.segments : tpl.segments;
@@ -74,17 +105,17 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
   const estimatedCost = useMemo(() => WorkflowManager.estimateStoryboardProCost(storyboard), [storyboard.storyDescription, storyboard.videoModel, storyboard.imageModel, storyboard.textModel, storyboard.mode]);
   const validationErrors = useMemo(() => effectiveKey ? WorkflowManager.validateStoryboardPro(effectiveKey, storyboard) : [], [effectiveKey, storyboard.storyDescription, storyboard.storyboardCount, storyboard.duration]);
 
-  const storyboardImageUrl = outputs?.find((o: any) => o.outputName === 'storyboard_image_url')?.text
-    || outputs?.find((o: any) => o.outputName === 'storyboard_image_url')?.url;
-  const masterPromptText = outputs?.find((o: any) => o.outputName === 'master_prompt')?.text
-    || outputs?.find((o: any) => o.outputName === 'master_prompt')?.url;
-  const videoPromptsText = outputs?.find((o: any) => o.outputName === 'video_prompts')?.text
-    || outputs?.find((o: any) => o.outputName === 'video_prompts')?.url;
-  const dialogueTextOutput = outputs?.find((o: any) => o.outputName === 'dialogue_text')?.text
-    || outputs?.find((o: any) => o.outputName === 'dialogue_text')?.url;
+  const storyboardImageUrl = outputs?.find((o: ComfyUIOutputItem) => o.outputName === 'storyboard_image_url')?.text
+    || outputs?.find((o: ComfyUIOutputItem) => o.outputName === 'storyboard_image_url')?.url;
+  const masterPromptText = outputs?.find((o: ComfyUIOutputItem) => o.outputName === 'master_prompt')?.text
+    || outputs?.find((o: ComfyUIOutputItem) => o.outputName === 'master_prompt')?.url;
+  const videoPromptsText = outputs?.find((o: ComfyUIOutputItem) => o.outputName === 'video_prompts')?.text
+    || outputs?.find((o: ComfyUIOutputItem) => o.outputName === 'video_prompts')?.url;
+  const dialogueTextOutput = outputs?.find((o: ComfyUIOutputItem) => o.outputName === 'dialogue_text')?.text
+    || outputs?.find((o: ComfyUIOutputItem) => o.outputName === 'dialogue_text')?.url;
   const hasResult = result?.status === 'completed' && outputs?.length > 0;
 
-  let parsedSegments: any[] = [];
+  let parsedSegments: ParsedStoryboardSegment[] = [];
   if (videoPromptsText) {
     try { parsedSegments = JSON.parse(videoPromptsText); } catch { parsedSegments = []; }
   }
@@ -307,14 +338,11 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                参考图强度: {storyboard.imageFidelity}
-              </label>
-              <input
-                type="range" min="0" max="1" step="0.01"
+              <DebouncedSlider
                 value={storyboard.imageFidelity}
-                onChange={(e) => update({ imageFidelity: parseFloat(e.target.value) })}
-                className="w-full"
+                onChange={(v) => update({ imageFidelity: v })}
+                min={0} max={1} step={0.01}
+                label="参考图强度"
               />
             </div>
           </div>
@@ -502,28 +530,18 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
 
         {showAdvanced && (
           <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                引导强度: {storyboard.cfgScale}
-              </label>
-              <input
-                type="range" min="0" max="1" step="0.1"
-                value={storyboard.cfgScale}
-                onChange={(e) => update({ cfgScale: parseFloat(e.target.value) })}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                角色相似度: {storyboard.humanFidelity}
-              </label>
-              <input
-                type="range" min="0" max="1" step="0.01"
-                value={storyboard.humanFidelity}
-                onChange={(e) => update({ humanFidelity: parseFloat(e.target.value) })}
-                className="w-full"
-              />
-            </div>
+            <DebouncedSlider
+              value={storyboard.cfgScale}
+              onChange={(v) => update({ cfgScale: v })}
+              min={0} max={1} step={0.1}
+              label="引导强度"
+            />
+            <DebouncedSlider
+              value={storyboard.humanFidelity}
+              onChange={(v) => update({ humanFidelity: v })}
+              min={0} max={1} step={0.01}
+              label="角色相似度"
+            />
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">镜头控制</label>
               <select
@@ -618,7 +636,7 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
           </div>
           {showResult && (
             <div className="space-y-5">
-              {outputs?.filter((o: any) => o.type === 'VIDEO').map((o: any, i: number) => (
+              {outputs?.filter((o: ComfyUIOutputItem) => o.type === 'video').map((o: ComfyUIOutputItem, i: number) => (
                 <div key={`vid-${i}`}>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">视频</label>
                   {o.url && (
@@ -626,7 +644,7 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
                   )}
                 </div>
               ))}
-              {outputs?.filter((o: any) => o.type === 'AUDIO').map((o: any, i: number) => (
+              {outputs?.filter((o: ComfyUIOutputItem) => o.type === 'audio').map((o: ComfyUIOutputItem, i: number) => (
                 <div key={`aud-${i}`}>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                     <Mic className="w-4 h-4 inline mr-1" />对白音频
@@ -670,7 +688,7 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
                     <Wand2 className="w-4 h-4 inline mr-1" />分镜脚本
                   </label>
                   <div className="space-y-2">
-                    {parsedSegments.map((seg: any, idx: number) => (
+                    {parsedSegments.map((seg: ParsedStoryboardSegment, idx: number) => (
                       <div key={idx} className="p-3 bg-[var(--bg-tertiary)] rounded-lg">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-semibold text-[var(--accent-primary)]">段 {idx + 1}</span>
