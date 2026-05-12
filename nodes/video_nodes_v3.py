@@ -77,6 +77,7 @@ from ..utils.kling_helpers import (
 logger = logging.getLogger(__name__)
 
 KLING_SOUND_SUPPORTED_MODELS = {"kling-v2-5-turbo", "kling-v2-6", "kling-v3", "kling-v3-omni", "kling-video-o1"}
+KLING_I2V_NO_CFG_MODELS = {"kling-v2-master", "kling-v2-1", "kling-v2-1-master", "kling-v2-5-turbo", "kling-v2-6", "kling-v3"}
 
 
 def _validate_kling_sound(sound: str, model_name: str, node_name: str) -> str | None:
@@ -202,6 +203,11 @@ class KlingImageToVideoV3Node(IO.ComfyNode):
             raise Exception("End frame (image_tail) cannot be used with storyboards.")
         multi_shot, multi_prompt, shot_type = _parse_storyboard(storyboards, duration, model_name)
         camera_control = _parse_camera_control(camera_control_json)
+        if camera_control is not None:
+            camera_control.type = "simple"
+        if model_name in KLING_I2V_NO_CFG_MODELS and cfg_scale != 0.5:
+            logger.warning("[KlingImageToVideoV3] cfg_scale is not supported by %s; ignoring user value %.2f", model_name, cfg_scale)
+            cfg_scale = 0.5
         effective_sound = _validate_kling_sound(sound, model_name, "KlingImageToVideoV3")
         request = KlingImage2VideoRequest(
             model_name=model_name, prompt=prompt, image=resolved_image,
@@ -341,6 +347,8 @@ class KlingOmniVideoV3Node(IO.ComfyNode):
                 raise Exception("kling-video-o1 does not support audio generation.")
             if resolution == "4k":
                 raise Exception("kling-video-o1 does not support 4k resolution.")
+            if int(duration) > 10:
+                raise Exception("kling-video-o1 does not support duration > 10s. Use kling-v3-omni for longer videos.")
         mode_map = {"720p": "std", "1080p": "pro", "4k": "4k"}
         mode = mode_map.get(resolution, "pro")
         multi_shot, multi_prompt, shot_type = _parse_storyboard(storyboards, duration, model_name)

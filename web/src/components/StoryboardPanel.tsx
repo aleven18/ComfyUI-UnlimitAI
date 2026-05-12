@@ -74,12 +74,20 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
   const effectiveKey = getApiKey() || '';
   const validationErrors = effectiveKey ? WorkflowManager.validateStoryboardPro(effectiveKey, storyboard) : [];
 
-  const storyboardImageUrl = outputs?.find((o: any) => o.type === 'STRING' && o.url)?.url
-    || outputs?.find((o: any) => o.filename?.includes('storyboard_image'))?.url;
-  const masterPromptText = outputs?.find((o: any) => o.filename?.includes('master_prompt'))?.url;
-  const dialogueTextOutput = outputs?.find((o: any) => o.filename?.includes('dialogue_text'))?.url;
-  const videoPromptsOutput = outputs?.find((o: any) => o.filename?.includes('video_prompts'))?.url;
+  const storyboardImageUrl = outputs?.find((o: any) => o.outputName === 'storyboard_image_url')?.text
+    || outputs?.find((o: any) => o.outputName === 'storyboard_image_url')?.url;
+  const masterPromptText = outputs?.find((o: any) => o.outputName === 'master_prompt')?.text
+    || outputs?.find((o: any) => o.outputName === 'master_prompt')?.url;
+  const videoPromptsText = outputs?.find((o: any) => o.outputName === 'video_prompts')?.text
+    || outputs?.find((o: any) => o.outputName === 'video_prompts')?.url;
+  const dialogueTextOutput = outputs?.find((o: any) => o.outputName === 'dialogue_text')?.text
+    || outputs?.find((o: any) => o.outputName === 'dialogue_text')?.url;
   const hasResult = result?.status === 'completed' && outputs?.length > 0;
+
+  let parsedSegments: any[] = [];
+  if (videoPromptsText) {
+    try { parsedSegments = JSON.parse(videoPromptsText); } catch { parsedSegments = []; }
+  }
 
   return (
     <div className="space-y-6">
@@ -212,12 +220,12 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
           onChange={(e) => update({ storyDescription: e.target.value })}
           placeholder="例如：一只小狐狸误入黑暗魔法森林，在星光精灵的帮助下找到回家的路..."
           rows={3}
-          maxLength={500}
+          maxLength={2000}
           className="input-base resize-y"
         />
         <div className="flex justify-between items-center mt-1">
-          <span className={`text-xs ${storyboard.storyDescription.length > 500 ? 'text-[var(--accent-error)]' : 'text-[var(--text-tertiary)]'}`}>
-            {storyboard.storyDescription.length}/500
+          <span className={`text-xs ${storyboard.storyDescription.length > 2000 ? 'text-[var(--accent-error)]' : 'text-[var(--text-tertiary)]'}`}>
+            {storyboard.storyDescription.length}/2000
           </span>
         </div>
       </div>
@@ -362,6 +370,11 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
             <p className="text-[10px] text-[var(--text-tertiary)] mt-1">用于生成故事板视频</p>
           </div>
         </div>
+        {storyboard.textModel === 'deepseek-chat' && storyboard.characterImageUrls.length > 0 && (
+          <div className="mt-3 p-3 bg-[var(--accent-warning)] bg-opacity-10 border border-[var(--accent-warning)] border-opacity-30 rounded-lg text-sm text-[var(--accent-warning)]">
+            ⚠️ DeepSeek Chat 不支持图片分析，Step 1 将自动使用 GPT-4o Mini，可能产生额外费用
+          </div>
+        )}
       </div>
 
       <div className="card p-6">
@@ -602,9 +615,9 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
             </button>
           </div>
           {showResult && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {outputs?.filter((o: any) => o.type === 'VIDEO').map((o: any, i: number) => (
-                <div key={i}>
+                <div key={`vid-${i}`}>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">视频</label>
                   {o.url && (
                     <video src={o.url} controls className="w-full rounded-lg border border-[var(--border-default)]" />
@@ -612,7 +625,7 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
                 </div>
               ))}
               {outputs?.filter((o: any) => o.type === 'AUDIO').map((o: any, i: number) => (
-                <div key={`audio-${i}`}>
+                <div key={`aud-${i}`}>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
                     <Mic className="w-4 h-4 inline mr-1" />对白音频
                   </label>
@@ -621,56 +634,71 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
                   )}
                 </div>
               ))}
-              {outputs?.filter((o: any) => o.type === 'STRING').map((o: any, i: number) => {
-                const label = o.filename?.includes('master_prompt') ? 'Master Prompt (视觉圣经)'
-                  : o.filename?.includes('video_prompts') ? '分镜脚本'
-                  : o.filename?.includes('dialogue_text') ? '对白文本'
-                  : o.filename?.includes('storyboard_image') ? '参考图 URL'
-                  : `输出 ${i + 1}`;
-                if (o.filename?.includes('storyboard_image') && o.url) {
-                  return (
-                    <div key={`str-${i}`}>
-                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                        <Image className="w-4 h-4 inline mr-1" />参考图
-                      </label>
-                      <img src={o.url} alt="参考图" className="max-w-sm rounded-lg border border-[var(--border-default)]" />
-                    </div>
-                  );
-                }
-                if (o.filename?.includes('master_prompt')) {
-                  return (
-                    <div key={`str-${i}`}>
-                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Master Prompt (视觉圣经)</label>
-                      <div className="relative">
-                        <pre className={`text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg overflow-auto whitespace-pre-wrap ${
-                          !masterPromptExpanded ? 'max-h-24' : ''
-                        }`}>
-                          {o.url || o.filename || '—'}
-                        </pre>
-                        <button
-                          onClick={() => setMasterPromptExpanded(!masterPromptExpanded)}
-                          className="text-[10px] text-[var(--accent-primary)] mt-1 hover:underline"
-                        >
-                          {masterPromptExpanded ? '收起' : '展开全部'}
-                        </button>
+              {storyboardImageUrl && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                    <Image className="w-4 h-4 inline mr-1" />参考图
+                  </label>
+                  <img src={storyboardImageUrl} alt="Storyboard" className="max-w-sm rounded-lg border border-[var(--border-default)]" />
+                </div>
+              )}
+              {masterPromptText && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                    <Eye className="w-4 h-4 inline mr-1" />Master Prompt (视觉圣经)
+                  </label>
+                  <div className="relative">
+                    <pre className={`text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg overflow-auto whitespace-pre-wrap ${
+                      !masterPromptExpanded ? 'max-h-32' : ''
+                    }`}>
+                      {masterPromptText}
+                    </pre>
+                    <button
+                      onClick={() => setMasterPromptExpanded(!masterPromptExpanded)}
+                      className="text-[10px] text-[var(--accent-primary)] mt-1 hover:underline"
+                    >
+                      {masterPromptExpanded ? '收起' : '展开全部'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {parsedSegments.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    <Wand2 className="w-4 h-4 inline mr-1" />分镜脚本
+                  </label>
+                  <div className="space-y-2">
+                    {parsedSegments.map((seg: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-[var(--accent-primary)]">段 {idx + 1}</span>
+                          <span className="text-[10px] text-[var(--text-tertiary)]">{seg.duration || '?'}s</span>
+                          {seg.camera && (
+                            <span className="text-[10px] text-[var(--text-tertiary)]">&#x1F4F7; {seg.camera}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[var(--text-secondary)]">{seg.prompt || '—'}</p>
+                        {seg.dialogue && (
+                          <p className="text-xs text-[var(--accent-primary)] mt-1 italic">&#x1F4AC; {seg.dialogue}</p>
+                        )}
+                        {seg.negative && (
+                          <p className="text-[10px] text-[var(--text-tertiary)] mt-1">&#x26D4; {seg.negative}</p>
+                        )}
                       </div>
-                    </div>
-                  );
-                }
-                if (o.filename?.includes('dialogue_text')) {
-                  return (
-                    <div key={`str-${i}`}>
-                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
-                        <Mic className="w-4 h-4 inline mr-1" />对白文本
-                      </label>
-                      <pre className="text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg overflow-auto whitespace-pre-wrap">
-                        {o.url || o.filename || '—'}
-                      </pre>
-                    </div>
-                  );
-                }
-                return null;
-              })}
+                    ))}
+                  </div>
+                </div>
+              )}
+              {dialogueTextOutput && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+                    <Mic className="w-4 h-4 inline mr-1" />对白文本
+                  </label>
+                  <pre className="text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg overflow-auto whitespace-pre-wrap">
+                    {dialogueTextOutput}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </div>

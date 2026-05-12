@@ -309,7 +309,7 @@ class SceneImageGeneratorV3Node(IO.ComfyNode):
             inputs=[
                 IO.String.Input("api_key", default="", multiline=False, tooltip="UnlimitAI API key."),
                 IO.String.Input("scenes_json", multiline=True, default="", tooltip="Scenes JSON from Novel to Drama."),
-                IO.Combo.Input("image_model", options=["flux-pro", "ideogram-v3", "kling-v2", "kling-v3", "dall-e-3", "gpt-image"], default="flux-pro"),
+                IO.Combo.Input("image_model", options=["flux-pro", "ideogram-v3", "kling-v2", "kling-v2-new", "kling-v2-1", "kling-v3", "dall-e-3", "gpt-image"], default="flux-pro"),
                 IO.Combo.Input("aspect_ratio", options=["16:9", "9:16", "1:1"], default="16:9"),
                 IO.Int.Input("max_scenes", default=10, min=1, max=50, step=1),
                 IO.Image.Input("ref_image", optional=True, tooltip="Reference image for character consistency (Kling only)."),
@@ -1028,15 +1028,20 @@ def _parse_camera_values_from_segment(seg: dict) -> KlingCameraConfig | None:
     if not cv or not isinstance(cv, dict):
         return None
     try:
+        def _clamp(val, lo, hi):
+            try:
+                return max(lo, min(hi, float(val)))
+            except (ValueError, TypeError):
+                return 0.0
         return KlingCameraConfig(
-            horizontal=float(cv.get("horizontal", 0.0)),
-            vertical=float(cv.get("vertical", 0.0)),
-            pan=float(cv.get("pan", 0.0)),
-            tilt=float(cv.get("tilt", 0.0)),
-            roll=float(cv.get("roll", 0.0)),
-            zoom=float(cv.get("zoom", 0.0)),
+            horizontal=_clamp(cv.get("horizontal", 0.0), -1.0, 1.0),
+            vertical=_clamp(cv.get("vertical", 0.0), -1.0, 1.0),
+            pan=_clamp(cv.get("pan", 0.0), -1.0, 1.0),
+            tilt=_clamp(cv.get("tilt", 0.0), -1.0, 1.0),
+            roll=_clamp(cv.get("roll", 0.0), -1.0, 1.0),
+            zoom=_clamp(cv.get("zoom", 0.0), -10.0, 10.0),
         )
-    except (ValueError, TypeError, Exception):
+    except Exception:
         return None
 
 
@@ -1210,7 +1215,7 @@ Rules:
 - Each segment must feel like a natural continuation of the previous one
 - Durations should vary based on content complexity (simple reaction: 2-3s, dialogue: 3-5s, action: 4-6s)
 - Camera values should be subtle; values above 0.5 create very fast movement
-- Only the first segment's camera_values will be used as global camera control
+- Each segment's camera_values will be applied to that segment individually
 
 Output ONLY the JSON array, no other text."""
 
@@ -1229,7 +1234,7 @@ Output ONLY the JSON array, no other text."""
                 IO.Float.Input("image_fidelity", default=0.5, min=0.0, max=1.0, step=0.01, tooltip="Reference image intensity."),
                 IO.Float.Input("human_fidelity", default=0.45, min=0.0, max=1.0, step=0.01, tooltip="Subject similarity strength."),
                 IO.Combo.Input("text_model", options=["gpt-4o", "gpt-4o-mini", "deepseek-chat", "claude-3-5-sonnet-20241022"], default="gpt-4o", tooltip="LLM model for prompt generation."),
-                IO.Combo.Input("image_model", options=["kling-v2", "kling-v3", "flux-pro", "ideogram-v3", "dall-e-3", "gpt-image"], default="kling-v2", tooltip="Image generation model for storyboard frame."),
+                IO.Combo.Input("image_model", options=["kling-v2", "kling-v2-new", "kling-v2-1", "kling-v3", "flux-pro", "ideogram-v3", "dall-e-3", "gpt-image"], default="kling-v2", tooltip="Image generation model for storyboard frame."),
                 IO.Combo.Input("video_model", options=["kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo", "kling-v3"], default="kling-v2-master", tooltip="Video generation model."),
                 IO.Int.Input("storyboard_count", default=4, min=2, max=6, step=1, tooltip="Number of storyboard segments (2-6)."),
                 IO.Combo.Input("duration", options=["5", "10"], default="5", tooltip="Total video duration in seconds."),
@@ -1249,6 +1254,7 @@ Output ONLY the JSON array, no other text."""
                 IO.String.Output("storyboard_image_url"),
                 IO.Audio.Output("dialogue_audio"),
                 IO.String.Output("dialogue_text"),
+                IO.Float.Output("total_cost"),
             ],
             hidden=[IO.Hidden.unique_id],
             is_api_node=True,
@@ -1263,10 +1269,21 @@ Output ONLY the JSON array, no other text."""
                       camera_style: str = "none", voice: str = "minimax-male-qn-jingying", generate_dialogue: str = "off"):
         validate_string(story_description, field_name="story_description", max_length=2000)
         key = validate_api_key(api_key)
+        total_cost = 0.0
+
+        LLM_PRICING = {
+            "deepseek-chat": {"input": 0.00014, "output": 0.00028},
+            "gpt-4o": {"input": 0.0025, "output": 0.01},
+            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
+            "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
+        }
+        IMAGE_PRICING = {"kling-v2": 0.3, "kling-v3": 0.5, "flux-pro": 0.4, "gpt-image": 0.3, "ideogram-v3": 0.35, "dall-e-3": 0.4}
+        VIDEO_PRICING = {"kling-v2-master": 2.0, "kling-v2-1-master": 2.5, "kling-v2-5-turbo": 1.5, "kling-v3": 3.0}
         char_urls = [u.strip() for u in character_image_urls.strip().split("\n") if u.strip()]
+        _URL_RE = re.compile(r'^https?://[^\s<>"{}|\\^`\[\]]+$')
         for i, url in enumerate(char_urls):
-            if not url.startswith(("http://", "https://")):
-                raise Exception(f"character_image_urls line {i+1} is not a valid URL (must start with http:// or https://): {url[:80]}")
+            if not _URL_RE.match(url):
+                raise Exception(f"character_image_urls line {i+1} is not a valid URL: {url[:80]}")
 
         VISION_MODELS = {"gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet-20241022"}
         effective_text_model = text_model
@@ -1300,6 +1317,10 @@ Output ONLY the JSON array, no other text."""
             logger.warning("[STORYBOARD_PRO] Step 1 output truncated (finish_reason=length). Consider increasing max_tokens or shortening the story description.")
         master_prompt = extract_text_content(step1_response.choices[0].message.content)
 
+        s1_rates = LLM_PRICING.get(effective_text_model, LLM_PRICING["deepseek-chat"])
+        if step1_response.usage:
+            total_cost += (step1_response.usage.prompt_tokens / 1000 * s1_rates["input"]) + (step1_response.usage.completion_tokens / 1000 * s1_rates["output"])
+
         # Step 2/6: LLM → segment video prompts + dialogue + camera
         logger.info("[STORYBOARD_PRO] STEP 2/6: Generating video script...")
         instruction_b = cls.META_INSTRUCTION_B_CUSTOM_CAMERA if camera_style == "custom" else cls.META_INSTRUCTION_B
@@ -1312,11 +1333,12 @@ Generate exactly {storyboard_count} storyboard segments for a {duration}-second 
 Total duration of all segments must equal {duration} seconds.
 
 Output ONLY the JSON array:"""
+        JSON_OBJECT_MODELS = VISION_MODELS | {"deepseek-chat"}
         step2_request = TextGenerationRequest(
             model=text_model,
             messages=[ChatMessage(role="user", content=step2_prompt)],
             temperature=0.7, max_tokens=4096,
-            response_format={"type": "json_object"} if text_model in VISION_MODELS else None,
+            response_format={"type": "json_object"} if text_model in JSON_OBJECT_MODELS else None,
         )
         step2_response: TextGenerationResponse = await sync_op(
             cls, endpoint=ApiEndpoint(path="/v1/chat/completions", method="POST"),
@@ -1327,6 +1349,10 @@ Output ONLY the JSON array:"""
         if step2_response.choices[0].finish_reason == "length":
             logger.warning("[STORYBOARD_PRO] Step 2 output truncated (finish_reason=length). Segment prompts may be incomplete. Consider reducing storyboard_count or increasing max_tokens.")
         segments_text = extract_text_content(step2_response.choices[0].message.content)
+
+        s2_rates = LLM_PRICING.get(text_model, LLM_PRICING["deepseek-chat"])
+        if step2_response.usage:
+            total_cost += (step2_response.usage.prompt_tokens / 1000 * s2_rates["input"]) + (step2_response.usage.completion_tokens / 1000 * s2_rates["output"])
 
         segments_data = parse_json_safe(segments_text, "segments")
         segments = segments_data if isinstance(segments_data, list) else []
@@ -1359,9 +1385,19 @@ Output ONLY the JSON array:"""
             prompt_text = str(seg.get("prompt", ""))[:512]
             if not prompt_text.strip():
                 prompt_text = f"Scene {i+1}"
-            multi_prompt.append(KlingMultiPromptItem(index=i+1, prompt=prompt_text, duration=str(seg.get("duration", 5))))
+            seg_camera: KlingCameraControl | None = None
+            if camera_style == "simple":
+                cam_text = seg.get("camera", "")
+                if cam_text:
+                    cam_config = _map_camera_text_to_preset(cam_text)
+                    if cam_config:
+                        seg_camera = KlingCameraControl(type="simple", config=cam_config)
+            elif camera_style == "custom":
+                cam_config = _parse_camera_values_from_segment(seg)
+                if cam_config:
+                    seg_camera = KlingCameraControl(type="simple", config=cam_config)
+            multi_prompt.append(KlingMultiPromptItem(index=i+1, prompt=prompt_text, duration=str(seg.get("duration", 5)), camera_control=seg_camera))
 
-        # P2: Determine camera_control
         camera_control: KlingCameraControl | None = None
         if camera_style == "simple":
             for seg in segments:
@@ -1395,7 +1431,8 @@ Output ONLY the JSON array:"""
         if setting_prompt:
             logger.info("[STORYBOARD_PRO] Using SETTING-based prompt for reference image")
         try:
-            if image_model.startswith("kling") and len(char_urls) > 1:
+            _MULTI_I2I_MODELS = {"kling-v2", "kling-v2-new", "kling-v2-1"}
+            if image_model.startswith("kling") and len(char_urls) > 1 and image_model in _MULTI_I2I_MODELS:
                 subject_list = [KlingMultiImage2ImageSubjectItem(subject_image=url) for url in char_urls]
                 img_request = KlingMultiImage2ImageRequest(
                     model_name=image_model, prompt=ref_prompt, aspect_ratio=aspect_ratio, n=1,
@@ -1418,6 +1455,8 @@ Output ONLY the JSON array:"""
                         storyboard_image_url = img_data.task_result.images[0].url
             elif image_model.startswith("kling"):
                 ref_url = char_urls[0] if char_urls else ""
+                if len(char_urls) > 1:
+                    logger.warning("[STORYBOARD_PRO] model '%s' does not support multi-image2image; using first reference image only", image_model)
                 kling_model = image_model
                 img_request = KlingImageGenRequest(
                     model_name=kling_model, prompt=ref_prompt, aspect_ratio=aspect_ratio, n=1,
@@ -1488,6 +1527,9 @@ Output ONLY the JSON array:"""
         except Exception as e:
             logger.warning(f"[STORYBOARD_PRO] Step 3 failed, will use text-to-video: {e}")
             storyboard_image_url = ""
+
+        if storyboard_image_url:
+            total_cost += IMAGE_PRICING.get(image_model, 0.3)
 
         # Step 4/6: Generate dialogue audio (P4)
         dialogue_audio_output = None
@@ -1561,6 +1603,8 @@ Output ONLY the JSON array:"""
         if not video_url:
             raise Exception("Video task completed but no video URL found.")
 
+        total_cost += VIDEO_PRICING.get(video_model, 2.0)
+
         # Step 6/6: ffmpeg mix video + dialogue
         final_video_output = None
         if generate_dialogue == "on" and audio_bytes_raw is not None and dialogue_audio_output is not None:
@@ -1580,8 +1624,10 @@ Output ONLY the JSON array:"""
         if final_video_output is None:
             final_video_output = await download_url_to_video_output(video_url, cls=cls)
 
+        logger.info("[STORYBOARD_PRO] Total cost: $%.4f", total_cost)
         return IO.NodeOutput(final_video_output, master_prompt, video_prompts_json,
-                             storyboard_image_url, dialogue_audio_output, dialogue_text_str)
+                             storyboard_image_url, dialogue_audio_output, dialogue_text_str,
+                             total_cost)
 
 
 class UnlimitAIWorkflowV3Extension(ComfyExtension):
