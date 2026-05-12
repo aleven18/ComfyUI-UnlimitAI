@@ -271,6 +271,18 @@ export class WorkflowManager {
           project.negativePrompt,
           project.cameraControlJson,
         ];
+      } else if (node.type === 'StoryboardVideoNode') {
+        const values = node.widgets_values || [];
+        values[0] = apiKey;
+        values[1] = segmentsJson;
+        values[2] = project.videoModel;
+        values[3] = project.duration;
+        values[4] = project.aspectRatio;
+        values[5] = project.cfgScale;
+        values[6] = project.mode;
+        values[7] = project.negativePrompt;
+        values[8] = project.cameraControlJson;
+        node.widgets_values = values;
       }
     });
 

@@ -170,7 +170,7 @@ class ContentDeduplicator:
     def _generate_hash(self, content: str, content_type: str) -> str:
         """生成内容哈希"""
         hash_data = f"{content_type}:{content}"
-        return hashlib.md5(hash_data.encode('utf-8')).hexdigest()
+        return hashlib.sha256(hash_data.encode('utf-8')).hexdigest()
     
     def _get_from_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
         """从缓存获取"""

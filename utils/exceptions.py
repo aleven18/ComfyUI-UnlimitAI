@@ -147,13 +147,17 @@ class UnlimitAIError(Exception):
         code: str = ErrorCodes.UNKNOWN_ERROR,
         details: Optional[Dict[str, Any]] = None,
         cause: Optional[Exception] = None,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        status_code: Optional[int] = None,
+        response_body: Optional[Any] = None,
     ):
         self.code = code
         self.message = message or ErrorMessages.get(code, **(details or {}))
         self.details = details or {}
         self.cause = cause
         self.context = context or {}
+        self.status_code = status_code
+        self.response_body = response_body
         
         super().__init__(self.message)
     

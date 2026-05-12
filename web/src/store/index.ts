@@ -33,7 +33,7 @@ interface AppState {
   setPreset: (preset: PresetType) => void;
   
   storyboard: StoryboardProject;
-  setStoryboard: (sb: StoryboardProject) => void;
+  setStoryboard: (sb: StoryboardProject | ((prev: StoryboardProject) => StoryboardProject)) => void;
   
   result: ConversionResult | null;
   setResult: (result: ConversionResult | null) => void;
@@ -63,7 +63,7 @@ export const useAppStore = create<AppState>((set) => ({
   setPreset: (preset) => set({ preset }),
   
   storyboard: { ...DEFAULT_STORYBOARD },
-  setStoryboard: (storyboard) => set({ storyboard }),
+  setStoryboard: (sb) => set((state) => ({ storyboard: typeof sb === 'function' ? sb(state.storyboard) : sb })),
   
   result: null,
   setResult: (result) => set({ result }),

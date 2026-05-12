@@ -453,7 +453,7 @@ class RateLimiter:
             # 等待
             sleep_time = self.period - (now - self.calls[0])
             if sleep_time > 0:
-                time.sleep(min(sleep_time, 0.1))
+                time.sleep(sleep_time)
     
     async def acquire_async(self, timeout: Optional[float] = None) -> bool:
         """异步获取调用许可"""
@@ -473,7 +473,7 @@ class RateLimiter:
             
             sleep_time = self.period - (now - self.calls[0])
             if sleep_time > 0:
-                await asyncio.sleep(min(sleep_time, 0.1))
+                await asyncio.sleep(sleep_time)
 
 
 # 全局延迟管理器

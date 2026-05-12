@@ -209,7 +209,7 @@ function ProjectSettingsPanel() {
           {settings.apiKey && (
             <div className="mt-3 p-3 bg-[var(--bg-secondary)] rounded-lg">
               <div className="text-xs text-[var(--text-secondary)]">
-                已配置 API Key: {settings.apiKey.substring(0, 20)}...
+                已配置 API Key: {settings.apiKey.length > 12 ? `${settings.apiKey.substring(0, 4)}...${settings.apiKey.substring(settings.apiKey.length - 4)}` : '****'}
               </div>
             </div>
           )}

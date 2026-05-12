@@ -767,15 +767,10 @@ def _wrap_model_extractor(
 ) -> Callable[[dict[str, Any]], Any] | None:
     if extractor is None:
         return None
-    _cache: dict[int, M] = {}
 
     def _wrapped(d: dict[str, Any]) -> Any:
         try:
-            key = id(d)
-            model = _cache.get(key)
-            if model is None:
-                model = response_model.model_validate(d)
-                _cache[key] = model
+            model = response_model.model_validate(d)
             return extractor(model)
         except Exception as e:
             logging.error("Extractor failed (typed -> dict wrapper): %s", e)

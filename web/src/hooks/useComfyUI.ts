@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { comfyUIClient } from '@/lib/comfyui-client';
 import { WorkflowManager } from '@/lib/workflow-manager';
 import { useAppStore } from '@/store';
@@ -30,6 +30,7 @@ export function useComfyUI() {
     clearLogs,
   } = useAppStore();
 
+  const isConvertingRef = useRef(false);
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workflowOutputs, setWorkflowOutputs] = useState<WorkflowOutput[]>([]);
@@ -46,10 +47,15 @@ export function useComfyUI() {
 
   const ts = () => new Date().toLocaleTimeString();
 
+  const _setConverting = (val: boolean) => {
+    isConvertingRef.current = val;
+    setIsConverting(val);
+  };
+
   const startConversionWithStoryboard = async (shots: Shot[]) => {
-    if (isConverting) return;
+    if (isConvertingRef.current) return;
     try {
-      setIsConverting(true);
+      _setConverting(true);
       setError(null);
       clearOutputs();
       clearLogs();
@@ -110,19 +116,19 @@ export function useComfyUI() {
         outputs: wfOutputs.map(o => ({ type: o.type, filename: o.filename, url: o.url }))
       });
       
-      setIsConverting(false);
+      _setConverting(false);
       
     } catch (err: any) {
       setError(err.message || '转换失败');
-      setIsConverting(false);
+      _setConverting(false);
       addLog(`[${ts()}] 错误: ${err.message}`);
     }
   };
 
   const startStoryboardConversion = async () => {
-    if (isConverting) return;
+    if (isConvertingRef.current) return;
     try {
-      setIsConverting(true);
+      _setConverting(true);
       setError(null);
       clearOutputs();
       clearLogs();
@@ -178,18 +184,18 @@ export function useComfyUI() {
       });
 
       addLog(`[${ts()}] Storyboard Pro 生成完成!`);
-      setIsConverting(false);
+      _setConverting(false);
     } catch (err: any) {
       setError(err.message || '转换失败');
-      setIsConverting(false);
+      _setConverting(false);
       addLog(`[${ts()}] 错误: ${err.message}`);
     }
   };
 
   const startConversion = async () => {
-    if (isConverting) return;
+    if (isConvertingRef.current) return;
     try {
-      setIsConverting(true);
+      _setConverting(true);
       setError(null);
       clearOutputs();
       clearLogs();
@@ -236,10 +242,10 @@ export function useComfyUI() {
       });
 
       addLog(`[${ts()}] 转换完成!`);
-      setIsConverting(false);
+      _setConverting(false);
     } catch (err: any) {
       setError(err.message || '转换失败');
-      setIsConverting(false);
+      _setConverting(false);
       addLog(`[${ts()}] 错误: ${err.message}`);
     }
   };
@@ -247,9 +253,8 @@ export function useComfyUI() {
   const stopConversion = async () => {
     try {
       await comfyUIClient.interrupt();
-      setIsConverting(false);
+      _setConverting(false);
       setResult(result ? { ...result, status: 'error', error: '用户中断' } : null);
-      addLog(`[${ts()}] 任务已中断`);
     } catch (err: any) {
       setError(err.message);
     }

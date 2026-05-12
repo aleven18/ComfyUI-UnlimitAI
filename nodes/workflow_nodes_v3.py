@@ -23,6 +23,7 @@ from ..unlimitai_util import (
     validate_api_key,
     validate_string,
 )
+from ..unlimitai_util.common_exceptions import ValidationError, UnlimitAIError
 from ..apis.kling import (
     KLING_IMAGE_GEN,
     KLING_IMAGE_GEN_POLL,
@@ -218,13 +219,13 @@ class StoryboardComposerV3Node(IO.ComfyNode):
             prompt = storyboards.get(f"storyboard_{i}_prompt", "")
             duration = storyboards.get(f"storyboard_{i}_duration", 5)
             if not prompt.strip():
-                raise Exception(f"Storyboard segment {i} prompt is empty.")
+                raise ValidationError(f"Storyboard segment {i} prompt is empty.")
             if len(prompt) > 512:
-                raise Exception(f"Storyboard segment {i} prompt exceeds 512 characters.")
+                raise ValidationError(f"Storyboard segment {i} prompt exceeds 512 characters.")
             segments.append({"index": i, "prompt": prompt, "duration": duration})
             total += duration
         if total != int(total_duration):
-            raise Exception(
+            raise ValidationError(
                 f"Total segment duration ({total}s) must equal total_duration ({total_duration}s)."
             )
         result = {"total_duration": int(total_duration), "segments": segments}
@@ -288,10 +289,10 @@ class NovelToDramaV3Node(IO.ComfyNode):
         text = extract_text_content(response.choices[0].message.content) if response.choices else ""
         if not text:
             return IO.NodeOutput("", "Empty response from API", 0.0)
-        pricing = {"deepseek-chat": {"input": 0.00014, "output": 0.00028}, "gpt-4o": {"input": 0.0025, "output": 0.01}, "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015}}
+        pricing = LLM_PRICING
         rates = pricing.get(text_model, pricing["deepseek-chat"])
-        pt = response.usage.prompt_tokens
-        ct = response.usage.completion_tokens
+        pt = response.usage.prompt_tokens if response.usage else 0
+        ct = response.usage.completion_tokens if response.usage else 0
         cost = (pt / 1000 * rates["input"]) + (ct / 1000 * rates["output"])
         data = parse_json_safe(text, "scenes")
         summary = data.get("summary", "")
@@ -399,18 +400,17 @@ class SceneImageGeneratorV3Node(IO.ComfyNode):
                         if poll_response.data and poll_response.data.task_result and poll_response.data.task_result.images:
                             img_url = poll_response.data.task_result.images[0].url
                 elif image_model == "flux-pro":
-                    payload = {"prompt": prompt, "image_size": "landscape_16_9" if aspect_ratio == "16:9" else "portrait_9_16" if aspect_ratio == "9:16" else "square", "num_images": 1, "enable_safety_checker": True, "output_format": "jpeg", "sync": True}
+                    payload = {"prompt": prompt, "image_size": ASPECT_RATIO_MAPS["flux"].get(aspect_ratio, "landscape_16_9"), "num_images": 1, "enable_safety_checker": True, "output_format": "jpeg", "sync": True}
                     response = await sync_op_raw(cls, endpoint=ApiEndpoint(path="/fal-ai/flux-pro", method="POST"), data=payload, api_key=key, wait_label=f"Image {idx+1}/{total}", estimated_duration=15)
                     images = response.get("images", []) if isinstance(response, dict) else []
                     img_url = images[0].get("url", "") if images and isinstance(images[0], dict) else ""
                 elif image_model == "ideogram-v3":
-                    _ideo_ar_map = {"16:9": "ASPECT_16_9", "9:16": "ASPECT_9_16", "1:1": "ASPECT_1_1"}
-                    payload = {"prompt": prompt, "aspect_ratio": _ideo_ar_map.get(aspect_ratio, "ASPECT_16_9"), "model": "ideogram-v3", "output_format": "jpeg", "enable_safety_checker": True, "sync": True}
+                    payload = {"prompt": prompt, "aspect_ratio": ASPECT_RATIO_MAPS["ideogram"].get(aspect_ratio, "ASPECT_16_9"), "model": "ideogram-v3", "output_format": "jpeg", "enable_safety_checker": True, "sync": True}
                     response = await sync_op_raw(cls, endpoint=ApiEndpoint(path="/v1/ideogram/generate", method="POST"), data=payload, api_key=key, wait_label=f"Image {idx+1}/{total}", estimated_duration=12)
                     data_list = response.get("data", []) if isinstance(response, dict) else []
                     img_url = data_list[0].get("url", "") if data_list and isinstance(data_list[0], dict) else ""
                 else:
-                    payload = {"prompt": prompt, "model": "dall-e-3", "size": "1792x1024" if aspect_ratio == "16:9" else "1024x1792" if aspect_ratio == "9:16" else "1024x1024"}
+                    payload = {"prompt": prompt, "model": "dall-e-3", "size": ASPECT_RATIO_MAPS["dalle"].get(aspect_ratio, "1792x1024")}
                     response = await sync_op_raw(cls, endpoint=ApiEndpoint(path="/v1/images/generations", method="POST"), data=payload, api_key=key, wait_label=f"Image {idx+1}/{total}", estimated_duration=15)
                     data_list = response.get("data", []) if isinstance(response, dict) else []
                     img_url = data_list[0].get("url", "") if data_list and isinstance(data_list[0], dict) else ""
@@ -474,7 +474,7 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
             return await cls._execute_combine_storyboard(key, images, duration, aspect_ratio, video_model)
 
         if storyboard_mode == "combine_scenes" and not video_model.startswith("kling"):
-            logger.warning(f"[SCENE_VIDEO] storyboard_mode='combine_scenes' requires a Kling model, got '{video_model}'; ignoring storyboard_mode")
+            logger.warning("[SCENE_VIDEO] storyboard_mode='combine_scenes' requires a Kling model, got '%s'; ignoring storyboard_mode", video_model)
 
         ctx = AsyncWorkflowContext()
         results = []
@@ -600,7 +600,7 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
         total_duration = int(duration)
         seg_duration = total_duration // num_scenes
         if seg_duration < 1:
-            raise Exception(f"Duration {total_duration}s too short for {num_scenes} scenes.")
+            raise ValidationError(f"Duration {total_duration}s too short for {num_scenes} scenes.")
         remainder = total_duration - seg_duration * num_scenes
 
         multi_prompt = []
@@ -641,9 +641,9 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
             data=request, response_model=KlingSubmitResponse, api_key=key,
             wait_label="Submitting storyboard video", estimated_duration=5,
         )
-        task_id = submit.data.task_id
+        task_id = submit.data.task_id if submit.data else ''
         if not task_id:
-            raise Exception(f"Kling storyboard submit failed: {submit}")
+            raise ValidationError(f"Kling storyboard submit failed: {submit}")
 
         poll_response: KlingPollResponse = await poll_op(
             cls, poll_endpoint=ApiEndpoint(path=poll_path.format(task_id), method="GET"),
@@ -656,7 +656,7 @@ class SceneVideoGeneratorV3Node(IO.ComfyNode):
         if poll_response.data and poll_response.data.task_result and poll_response.data.task_result.videos:
             video_url = poll_response.data.task_result.videos[0].url
         if not video_url:
-            raise Exception("Kling storyboard task completed but no video URL found.")
+            raise ValidationError("Kling storyboard task completed but no video URL found.")
 
         scene_numbers = [img.get("scene_number", i + 1) for i, img in enumerate(images)]
         results = [{"scene_number": sn, "video_url": video_url, "status": "success", "storyboard": True} for sn in scene_numbers]
@@ -880,38 +880,38 @@ class StoryboardVideoV3Node(IO.ComfyNode):
         try:
             parsed = json.loads(segments_json)
         except json.JSONDecodeError as e:
-            raise Exception(f"Invalid segments_json: {e}")
+            raise ValidationError(f"Invalid segments_json: {e}")
 
         if isinstance(parsed, dict) and "segments" in parsed:
             segments = parsed["segments"]
         elif isinstance(parsed, list):
             segments = parsed
         else:
-            raise Exception("segments_json must be a JSON array or a dict with a 'segments' key.")
+            raise ValidationError("segments_json must be a JSON array or a dict with a 'segments' key.")
 
         if not isinstance(segments, list) or len(segments) < 2:
-            raise Exception("segments_json must be a JSON array with at least 2 segments.")
+            raise ValidationError("segments_json must be a JSON array with at least 2 segments.")
         if len(segments) > 6:
-            raise Exception("Maximum 6 storyboard segments allowed.")
+            raise ValidationError("Maximum 6 storyboard segments allowed.")
 
         total_sb_duration = 0
         multi_prompt = []
         for i, seg in enumerate(segments):
             if not isinstance(seg, dict):
-                raise Exception(f"Segment {i+1} must be a JSON object.")
+                raise ValidationError(f"Segment {i+1} must be a JSON object.")
             prompt = seg.get("prompt", "")
             if not prompt.strip():
-                raise Exception(f"Segment {i+1} prompt is empty.")
+                raise ValidationError(f"Segment {i+1} prompt is empty.")
             if len(prompt) > 512:
-                raise Exception(f"Segment {i+1} prompt exceeds 512 characters.")
+                raise ValidationError(f"Segment {i+1} prompt exceeds 512 characters.")
             d = int(seg.get("duration", 5))
             if d < 1 or d > 15:
-                raise Exception(f"Segment {i+1} duration must be 1-15 seconds.")
+                raise ValidationError(f"Segment {i+1} duration must be 1-15 seconds.")
             multi_prompt.append(KlingMultiPromptItem(index=i + 1, prompt=prompt, duration=str(d)))
             total_sb_duration += d
 
         if total_sb_duration != int(duration):
-            raise Exception(f"Total segment duration ({total_sb_duration}s) must equal video duration ({duration}s).")
+            raise ValidationError(f"Total segment duration ({total_sb_duration}s) must equal video duration ({duration}s).")
 
         combined_prompt = " ; ".join(mp.prompt for mp in multi_prompt)
         camera_control = _parse_camera_control(camera_control_json)
@@ -930,6 +930,22 @@ class StoryboardVideoV3Node(IO.ComfyNode):
             max_poll_attempts=240, estimated_duration=180)
         return IO.NodeOutput(video_output, task_id)
 
+
+ASPECT_RATIO_MAPS = {
+    "flux": {"16:9": "landscape_16_9", "9:16": "portrait_9_16", "1:1": "square"},
+    "ideogram": {"16:9": "ASPECT_16_9", "9:16": "ASPECT_9_16", "1:1": "ASPECT_1_1"},
+    "gpt_image": {"16:9": "1536x1024", "9:16": "1024x1536", "1:1": "1024x1024"},
+    "dalle": {"16:9": "1792x1024", "9:16": "1024x1792", "1:1": "1024x1024"},
+}
+
+LLM_PRICING = {
+    "deepseek-chat": {"input": 0.00014, "output": 0.00028},
+    "gpt-4o": {"input": 0.0025, "output": 0.01},
+    "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
+    "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
+}
+IMAGE_PRICING = {"kling-v2": 0.3, "kling-v2-new": 0.3, "kling-v2-1": 0.3, "kling-v3": 0.5, "flux-pro": 0.4, "gpt-image": 0.3, "ideogram-v3": 0.35, "dall-e-3": 0.4}
+VIDEO_PRICING = {"kling-v2-master": 2.0, "kling-v2-1-master": 2.5, "kling-v2-5-turbo": 1.5, "kling-v3": 3.0}
 
 CAMERA_PRESETS: Dict[str, KlingCameraConfig] = {
     "dolly-in": KlingCameraConfig(zoom=-0.3),
@@ -1045,11 +1061,11 @@ def _parse_camera_values_from_segment(seg: dict) -> KlingCameraConfig | None:
         return None
 
 
-async def _tts_generate_dialogue(cls, dialogue_text: str, voice: str, api_key: str) -> tuple[bytes, str]:
+async def _tts_generate_dialogue(cls, dialogue_text: str, voice: str, api_key: str, language: str = "zh") -> tuple[bytes, str]:
     if voice.startswith("kling-"):
         voice_id = voice[len("kling-"):]
         from ..apis.kling import KlingTTSRequest as _KlingTTSRequest, KLING_TTS
-        request = _KlingTTSRequest(text=dialogue_text[:1000], voice_id=voice_id, voice_language="zh", voice_speed=1.0)
+        request = _KlingTTSRequest(text=dialogue_text[:1000], voice_id=voice_id, voice_language=language, voice_speed=1.0)
         response_dict = await sync_op_raw(
             cls, endpoint=ApiEndpoint(path=KLING_TTS, method="POST"),
             data=request, api_key=api_key,
@@ -1067,7 +1083,7 @@ async def _tts_generate_dialogue(cls, dialogue_text: str, voice: str, api_key: s
                         if audios and isinstance(audios[0], dict):
                             audio_url = audios[0].get("url", "")
         if not audio_url:
-            raise Exception("Kling TTS returned no audio URL.")
+            raise ValidationError("Kling TTS returned no audio URL.")
         audio_bytesio = await download_url_as_bytesio(audio_url, cls=cls)
         return audio_bytesio.getvalue(), audio_url
     else:
@@ -1080,7 +1096,7 @@ async def _tts_generate_dialogue(cls, dialogue_text: str, voice: str, api_key: s
         )
         audio_url = response.audio_url
         if not audio_url:
-            raise Exception("Minimax TTS returned no audio URL.")
+            raise ValidationError("Minimax TTS returned no audio URL.")
         audio_bytesio = await download_url_as_bytesio(audio_url, cls=cls)
         return audio_bytesio.getvalue(), audio_url
 
@@ -1327,24 +1343,17 @@ Output ONLY the JSON array, no other text."""
         key = validate_api_key(api_key)
         total_cost = 0.0
 
-        LLM_PRICING = {
-            "deepseek-chat": {"input": 0.00014, "output": 0.00028},
-            "gpt-4o": {"input": 0.0025, "output": 0.01},
-            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
-            "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
-        }
-        IMAGE_PRICING = {"kling-v2": 0.3, "kling-v3": 0.5, "flux-pro": 0.4, "gpt-image": 0.3, "ideogram-v3": 0.35, "dall-e-3": 0.4}
-        VIDEO_PRICING = {"kling-v2-master": 2.0, "kling-v2-1-master": 2.5, "kling-v2-5-turbo": 1.5, "kling-v3": 3.0}
+
         char_urls = [u.strip() for u in character_image_urls.strip().split("\n") if u.strip()]
         _URL_RE = re.compile(r'^https?://[^\s<>"{}|\\^`\[\]]+$')
         for i, url in enumerate(char_urls):
             if not _URL_RE.match(url):
-                raise Exception(f"character_image_urls line {i+1} is not a valid URL: {url[:80]}")
+                raise ValidationError(f"character_image_urls line {i+1} is not a valid URL: {url[:80]}")
 
         VISION_MODELS = {"gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet-20241022"}
         effective_text_model = text_model
         if char_urls and text_model not in VISION_MODELS:
-            logger.warning(f"[STORYBOARD_PRO] Model '{text_model}' does not support vision; auto-upgrading to 'gpt-4o-mini' for Step 1")
+            logger.warning("[STORYBOARD_PRO] Model '%s' does not support vision; auto-upgrading to 'gpt-4o-mini' for Step 1", text_model)
             effective_text_model = "gpt-4o-mini"
 
         # Step 1/6: LLM analyzes images + story → MASTER PROMPT
@@ -1368,7 +1377,7 @@ Output ONLY the JSON array, no other text."""
             data=step1_request, response_model=TextGenerationResponse, api_key=key,
             wait_label="Step 1/6: Analyzing characters", estimated_duration=20)
         if not step1_response.choices:
-            raise Exception("Step 1 failed: LLM returned no response.")
+            raise ValidationError("Step 1 failed: LLM returned no response.")
         if step1_response.choices[0].finish_reason == "length":
             logger.warning("[STORYBOARD_PRO] Step 1 output truncated (finish_reason=length). Consider increasing max_tokens or shortening the story description.")
         master_prompt = extract_text_content(step1_response.choices[0].message.content)
@@ -1401,7 +1410,7 @@ Output ONLY the JSON array:"""
             data=step2_request, response_model=TextGenerationResponse, api_key=key,
             wait_label="Step 2/6: Generating video script", estimated_duration=20)
         if not step2_response.choices:
-            raise Exception("Step 2 failed: LLM returned no response.")
+            raise ValidationError("Step 2 failed: LLM returned no response.")
         if step2_response.choices[0].finish_reason == "length":
             logger.warning("[STORYBOARD_PRO] Step 2 output truncated (finish_reason=length). Segment prompts may be incomplete. Consider reducing storyboard_count or increasing max_tokens.")
         segments_text = extract_text_content(step2_response.choices[0].message.content)
@@ -1551,16 +1560,14 @@ Output ONLY the JSON array:"""
                 storyboard_image_url = gpt_img_response.data[0].url if gpt_img_response.data else ""
             elif image_model == "flux-pro":
                 from ..apis.flux import FluxProRequest, FluxProResponse
-                _flux_size_map = {"16:9": "landscape_16_9", "9:16": "portrait_9_16", "1:1": "square"}
-                flux_request = FluxProRequest(prompt=ref_prompt, image_size=_flux_size_map.get(aspect_ratio, "landscape_16_9"), num_inference_steps=30, seed=0, guidance_scale=3.5, num_images=1, enable_safety_checker=True, output_format="jpeg", sync=True)
+                flux_request = FluxProRequest(prompt=ref_prompt, image_size=ASPECT_RATIO_MAPS["flux"].get(aspect_ratio, "landscape_16_9"), num_inference_steps=30, seed=0, guidance_scale=3.5, num_images=1, enable_safety_checker=True, output_format="jpeg", sync=True)
                 flux_response: FluxProResponse = await sync_op(
                     cls, endpoint=ApiEndpoint(path="/fal-ai/flux-pro", method="POST"),
                     data=flux_request, response_model=FluxProResponse, api_key=key,
                     wait_label="Step 3/6: Generating storyboard image (FLUX)", estimated_duration=15)
                 storyboard_image_url = flux_response.images[0].url if flux_response.images else ""
             elif image_model == "ideogram-v3":
-                _ideo_ar_map = {"16:9": "ASPECT_16_9", "9:16": "ASPECT_9_16", "1:1": "ASPECT_1_1"}
-                ideo_payload = {"prompt": ref_prompt, "aspect_ratio": _ideo_ar_map.get(aspect_ratio, "ASPECT_16_9"), "model": "ideogram-v3", "output_format": "jpeg", "enable_safety_checker": True, "sync": True}
+                ideo_payload = {"prompt": ref_prompt, "aspect_ratio": ASPECT_RATIO_MAPS["ideogram"].get(aspect_ratio, "ASPECT_16_9"), "model": "ideogram-v3", "output_format": "jpeg", "enable_safety_checker": True, "sync": True}
                 ideo_response = await sync_op_raw(
                     cls, endpoint=ApiEndpoint(path="/v1/ideogram/generate", method="POST"),
                     data=ideo_payload, api_key=key,
@@ -1569,8 +1576,7 @@ Output ONLY the JSON array:"""
                     data_list = ideo_response.get("data", [])
                     storyboard_image_url = data_list[0].get("url", "") if data_list and isinstance(data_list[0], dict) else ""
             elif image_model == "dall-e-3":
-                _dalle_size_map = {"16:9": "1792x1024", "9:16": "1024x1792", "1:1": "1024x1024"}
-                dalle_payload = {"prompt": ref_prompt, "model": "dall-e-3", "size": _dalle_size_map.get(aspect_ratio, "1792x1024")}
+                dalle_payload = {"prompt": ref_prompt, "model": "dall-e-3", "size": ASPECT_RATIO_MAPS["dalle"].get(aspect_ratio, "1792x1024")}
                 dalle_response = await sync_op_raw(
                     cls, endpoint=ApiEndpoint(path="/v1/images/generations", method="POST"),
                     data=dalle_payload, api_key=key,
@@ -1579,9 +1585,9 @@ Output ONLY the JSON array:"""
                     data_list = dalle_response.get("data", [])
                     storyboard_image_url = data_list[0].get("url", "") if data_list and isinstance(data_list[0], dict) else ""
             else:
-                logger.warning(f"[STORYBOARD_PRO] Unknown image_model '{image_model}', skipping Step 3")
+                logger.warning("[STORYBOARD_PRO] Unknown image_model '%s', skipping Step 3", image_model)
         except Exception as e:
-            logger.warning(f"[STORYBOARD_PRO] Step 3 failed, will use text-to-video: {e}")
+            logger.warning("[STORYBOARD_PRO] Step 3 failed, will use text-to-video: %s", e)
             storyboard_image_url = ""
 
         if storyboard_image_url:
@@ -1663,7 +1669,7 @@ Output ONLY the JSON array:"""
             wait_label="Step 5/6: Submitting video", estimated_duration=5)
         video_task_id = video_submit.data.task_id if video_submit.data else ""
         if not video_task_id:
-            raise Exception(f"Video submit failed: {video_submit}")
+            raise ValidationError(f"Video submit failed: {video_submit}")
 
         video_poll: KlingPollResponse = await poll_op(
             cls, poll_endpoint=ApiEndpoint(path=poll_path.format(video_task_id), method="GET"),
@@ -1676,7 +1682,7 @@ Output ONLY the JSON array:"""
         if video_poll.data and video_poll.data.task_result and video_poll.data.task_result.videos:
             video_url = video_poll.data.task_result.videos[0].url
         if not video_url:
-            raise Exception("Video task completed but no video URL found.")
+            raise ValidationError("Video task completed but no video URL found.")
 
         total_cost += VIDEO_PRICING.get(video_model, 2.0)
 
@@ -1694,7 +1700,7 @@ Output ONLY the JSON array:"""
                 else:
                     logger.warning("[STORYBOARD_PRO] ffmpeg mix failed, returning video without dialogue")
             except Exception as e:
-                logger.warning(f"[STORYBOARD_PRO] Step 6 mix failed: {e}")
+                logger.warning("[STORYBOARD_PRO] Step 6 mix failed: %s", e)
 
         if final_video_output is None:
             final_video_output = await download_url_to_video_output(video_url, cls=cls)

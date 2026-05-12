@@ -29,8 +29,8 @@ export function WorkflowConfig() {
                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2 uppercase tracking-wide">文本模型</label>
                 <select 
                   className="w-full px-3 py-2 text-sm bg-[var(--bg-primary)] border border-[var(--border-default)] rounded focus:outline-none focus:border-[var(--accent-primary)]"
-                  value={settings.defaultImageModel || 'gpt-4o-mini'}
-                  onChange={(e) => updateSettings({ defaultImageModel: e.target.value })}
+                  value={settings.defaultTextModel || 'gpt-4o-mini'}
+                  onChange={(e) => updateSettings({ defaultTextModel: e.target.value })}
                 >
                   <option value="gpt-4o-mini">GPT-4o Mini</option>
                   <option value="gpt-4o">GPT-4o</option>

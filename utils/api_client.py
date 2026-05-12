@@ -294,7 +294,7 @@ class InputValidator:
         """验证API Key格式"""
         if not api_key:
             return False
-        return len(api_key) >= 32
+        return len(api_key) >= 20
     
     @staticmethod
     def validate_prompt(prompt: str, max_length: int = 2000) -> bool:
@@ -320,7 +320,7 @@ class InputValidator:
         try:
             val = int(value)
             return min_val <= val <= max_val
-        except:
+        except (ValueError, TypeError):
             return False
 
 

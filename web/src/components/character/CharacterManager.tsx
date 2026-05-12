@@ -106,13 +106,6 @@ export function CharacterManager() {
                 )}
               </div>
               
-      
-      {/* AI Guide Character Creation Modal */}
-      <AIGuideCharacterCreation
-        isOpen={showAIGuide}
-        onClose={() => setShowAIGuide(false)}
-        onCreate={handleAIGuideCreate}
-      />
               <div className="p-3">
                 <h3 className="font-medium text-[var(--text-primary)] truncate">{character.name}</h3>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">

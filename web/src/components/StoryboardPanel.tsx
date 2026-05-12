@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAppStore } from '@/store';
 import { useProjectStore } from '@/store/projectStore';
 import { STORYBOARD_TEMPLATES, getTemplateById } from '@/data/storyboard-templates';
-import { StoryboardSegment, StoryboardTemplate } from '@/types';
+import { StoryboardSegment, StoryboardTemplate, StoryboardProject } from '@/types';
 import {
   Film, Sparkles, RotateCcw, Lightbulb,
   UserCircle, Camera, Eye, Image, Video, Wand2, CheckCircle2, Loader2,
@@ -46,7 +46,7 @@ export function StoryboardPanel({ onGenerate, isConverting, progress = 0, curren
 
   const canGenerate = storyboard.storyDescription.trim().length > 0 && !isConverting;
 
-  const update = (patch: Partial<typeof storyboard>) => setStoryboard({ ...storyboard, ...patch });
+  const update = (patch: Partial<StoryboardProject>) => setStoryboard((prev: StoryboardProject) => ({ ...prev, ...patch }));
 
   const currentStepIdx = isConverting ? Math.min(5, Math.floor(progress * 6 / 100)) : -1;
 

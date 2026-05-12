@@ -16,6 +16,8 @@ Author: AI Assistant
 Version: 1.2.0
 """
 
+from .__version__ import __version__
+
 from .nodes.text_nodes import NODE_CLASS_MAPPINGS as TEXT_NODES
 from .nodes.text_nodes import NODE_DISPLAY_NAME_MAPPINGS as TEXT_NAMES
 

@@ -2,7 +2,7 @@
 Version information for ComfyUI-UnlimitAI
 """
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 __author__ = "ComfyUI-UnlimitAI Team"
 __email__ = "contact@example.com"
 __license__ = "MIT"
