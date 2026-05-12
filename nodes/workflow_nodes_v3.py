@@ -1114,6 +1114,42 @@ def _ffmpeg_mix_video_audio(video_bytes: bytes, audio_bytes: bytes) -> bytes | N
             return None
 
 
+def _ffmpeg_concat_segment_audios(segments: list[tuple[bytes, float]], total_duration: float) -> bytes | None:
+    if not segments or not shutil.which("ffmpeg"):
+        return None
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filter_parts = []
+        inputs = []
+        for i, (audio_data, offset) in enumerate(segments):
+            seg_path = f"{tmpdir}/seg_{i}.mp3"
+            with open(seg_path, "wb") as f:
+                f.write(audio_data)
+            inputs.extend(["-i", seg_path])
+            filter_parts.append(f"[{i}:a]adelay={int(offset * 1000)}|{int(offset * 1000)}[a{i}]")
+        mix_inputs = "".join(f"[a{i}]" for i in range(len(segments)))
+        filter_str = ";".join(filter_parts) + f";{mix_inputs}amix=inputs={len(segments)}:duration=longest[out]"
+        output_path = f"{tmpdir}/mixed.mp3"
+        cmd = ["ffmpeg", "-y"] + inputs + [
+            "-filter_complex", filter_str,
+            "-map", "[out]",
+            "-t", str(total_duration),
+            output_path,
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, timeout=120)
+            if result.returncode != 0:
+                logger.warning("[STORYBOARD_PRO] ffmpeg segment concat failed: %s", result.stderr.decode()[:200])
+                return None
+            with open(output_path, "rb") as f:
+                return f.read()
+        except subprocess.TimeoutExpired:
+            logger.warning("[STORYBOARD_PRO] ffmpeg segment concat timed out")
+            return None
+        except Exception as e:
+            logger.warning("[STORYBOARD_PRO] ffmpeg segment concat error: %s", e)
+            return None
+
+
 class StoryboardProV3Node(IO.ComfyNode):
     META_INSTRUCTION_A = """You are an expert visual director and storyboard supervisor. Analyze the provided reference images and story description, then produce a MASTER PROMPT that serves as the visual bible for an AI-generated storyboard video.
 
@@ -1531,20 +1567,39 @@ Output ONLY the JSON array:"""
         if storyboard_image_url:
             total_cost += IMAGE_PRICING.get(image_model, 0.3)
 
-        # Step 4/6: Generate dialogue audio (P4)
+        # Step 4/6: Generate dialogue audio per-segment
         dialogue_audio_output = None
         dialogue_text_str = ""
         audio_bytes_raw = None
         if generate_dialogue == "on":
-            all_dialogue = [str(s.get("dialogue", "")).strip() for s in segments if s.get("dialogue")]
-            dialogue_text_str = "\n".join(all_dialogue)
-            if dialogue_text_str.strip():
+            dialogue_segments = []
+            offset = 0.0
+            for seg in segments:
+                seg_dur = int(seg.get("duration", 5))
+                seg_dialogue = str(seg.get("dialogue", "")).strip()
+                if seg_dialogue:
+                    dialogue_text_str += seg_dialogue + "\n"
+                    try:
+                        logger.info("[STORYBOARD_PRO] Step 4: TTS for segment at offset %.1fs", offset)
+                        seg_audio, _ = await _tts_generate_dialogue(cls, seg_dialogue, voice, key)
+                        dialogue_segments.append((seg_audio, offset))
+                    except Exception as e:
+                        logger.warning("[STORYBOARD_PRO] Step 4 TTS failed for segment at offset %.1fs: %s", offset, e)
+                offset += seg_dur
+
+            if dialogue_segments:
                 try:
-                    logger.info("[STORYBOARD_PRO] STEP 4/6: Generating dialogue audio...")
-                    audio_bytes_raw, _audio_url = await _tts_generate_dialogue(cls, dialogue_text_str, voice, key)
-                    dialogue_audio_output = audio_bytes_to_audio_input(audio_bytes_raw)
+                    logger.info("[STORYBOARD_PRO] Step 4/6: Concatenating %d dialogue segments...", len(dialogue_segments))
+                    if len(dialogue_segments) == 1:
+                        audio_bytes_raw = dialogue_segments[0][0]
+                    else:
+                        audio_bytes_raw = _ffmpeg_concat_segment_audios(dialogue_segments, float(duration))
+                    if audio_bytes_raw:
+                        dialogue_audio_output = audio_bytes_to_audio_input(audio_bytes_raw)
+                    else:
+                        logger.warning("[STORYBOARD_PRO] Step 4: ffmpeg concat returned None")
                 except Exception as e:
-                    logger.warning(f"[STORYBOARD_PRO] Step 4 TTS failed: {e}")
+                    logger.warning("[STORYBOARD_PRO] Step 4 segment concat failed: %s", e)
                     dialogue_audio_output = None
                     audio_bytes_raw = None
             else:
