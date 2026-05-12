@@ -1,6 +1,6 @@
 {
-  "last_node_id": 4,
-  "last_link_id": 3,
+  "last_node_id": 6,
+  "last_link_id": 7,
   "nodes": [
     {
       "id": 10,
@@ -53,10 +53,10 @@
       "outputs": [
         {"name": "video", "type": "VIDEO", "links": [2], "slot_index": 0},
         {"name": "master_prompt", "type": "STRING", "links": [3], "slot_index": 1},
-        {"name": "video_prompts", "type": "STRING", "links": null, "slot_index": 2},
-        {"name": "storyboard_image_url", "type": "STRING", "links": null, "slot_index": 3},
-        {"name": "dialogue_audio", "type": "AUDIO", "links": null, "slot_index": 4},
-        {"name": "dialogue_text", "type": "STRING", "links": null, "slot_index": 5}
+        {"name": "video_prompts", "type": "STRING", "links": [5], "slot_index": 2},
+        {"name": "storyboard_image_url", "type": "STRING", "links": [], "slot_index": 3},
+        {"name": "dialogue_audio", "type": "AUDIO", "links": [], "slot_index": 4},
+        {"name": "dialogue_text", "type": "STRING", "links": [7], "slot_index": 5}
       ],
       "title": "\ud83c\udfac Storyboard Pro"
     },
@@ -83,11 +83,37 @@
       "properties": {"Node name": "Show Master Prompt"},
       "inputs": [{"name": "text", "type": "STRING", "link": 3}],
       "title": "Master Prompt"
+    },
+    {
+      "id": 5,
+      "type": "ShowText|pysssss",
+      "pos": [1200, 550],
+      "size": [400, 250],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "properties": {"Node name": "Show Video Prompts"},
+      "inputs": [{"name": "text", "type": "STRING", "link": 5}],
+      "title": "Video Prompts"
+    },
+    {
+      "id": 6,
+      "type": "ShowText|pysssss",
+      "pos": [1200, 850],
+      "size": [400, 200],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "properties": {"Node name": "Show Dialogue Text"},
+      "inputs": [{"name": "text", "type": "STRING", "link": 7}],
+      "title": "Dialogue Text"
     }
   ],
   "links": [
     [1, 10, 0, 1, 0, "STRING"],
     [2, 1, 0, 2, 0, "VIDEO"],
-    [3, 1, 1, 3, 0, "STRING"]
+    [3, 1, 1, 3, 0, "STRING"],
+    [5, 1, 2, 5, 0, "STRING"],
+    [7, 1, 5, 6, 0, "STRING"]
   ]
 }

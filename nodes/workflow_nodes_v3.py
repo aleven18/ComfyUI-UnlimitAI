@@ -1097,10 +1097,30 @@ def _ffmpeg_mix_video_audio(video_bytes: bytes, audio_bytes: bytes) -> bytes | N
             f.write(video_bytes)
         with open(audio_path, "wb") as f:
             f.write(audio_bytes)
-        cmd = ["ffmpeg", "-y", "-i", video_path, "-i", audio_path,
-               "-c:v", "copy", "-c:a", "aac", "-shortest", output_path]
+        video_duration: float | None = None
+        if shutil.which("ffprobe"):
+            try:
+                probe_cmd = [
+                    "ffprobe", "-v", "quiet",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    video_path,
+                ]
+                probe_out = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=15)
+                if probe_out.returncode == 0 and probe_out.stdout.strip():
+                    video_duration = float(probe_out.stdout.strip())
+                    logger.info("[STORYBOARD_PRO] ffprobe video duration: %.2fs", video_duration)
+            except Exception as e:
+                logger.warning("[STORYBOARD_PRO] ffprobe failed, falling back to -shortest: %s", e)
+        ffmpeg_args: list[str] = ["ffmpeg", "-y", "-i", video_path, "-i", audio_path,
+                                  "-c:v", "copy", "-c:a", "aac"]
+        if video_duration is not None:
+            ffmpeg_args += ["-t", f"{video_duration:.3f}"]
+        else:
+            ffmpeg_args.append("-shortest")
+        ffmpeg_args.append(output_path)
         try:
-            result = subprocess.run(cmd, capture_output=True, timeout=120)
+            result = subprocess.run(ffmpeg_args, capture_output=True, timeout=120)
             if result.returncode != 0:
                 logger.warning("[STORYBOARD_PRO] ffmpeg mix failed: %s", result.stderr.decode()[:200])
                 return None
